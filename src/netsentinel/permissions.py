@@ -113,9 +113,15 @@ def check_permissions(
 
 def ensure_scan_permissions(status: PermissionStatus) -> None:
     """Aktif tarama öncesi son kale: yetki yoksa anlaşılır hatayla durur."""
-    if not status.can_scan:
-        mesaj = "\n".join(status.warnings) or "Yetki durumu yeniden denetlendi."
-        raise PermissionError(mesaj)
+    if status.can_scan:
+        return
+    mesaj = "\n".join(status.warnings)
+    if not mesaj:
+        mesaj = (
+            "Yetersiz yetki: aktif tarama (ARP) için CAP_NET_RAW + CAP_NET_ADMIN gerekir.\n"
+            + SETCAP_ONERISI.format(python=_python_yolu())
+        )
+    raise PermissionError(mesaj)
 
 
 def _python_yolu() -> str:

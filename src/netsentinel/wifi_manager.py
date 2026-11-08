@@ -14,6 +14,7 @@ Test edilebilirlik için komut çalıştırma ``Runner`` olarak enjekte edilir.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -175,6 +176,8 @@ def default_runner(args: Sequence[str], timeout: int) -> str:
             text=True,
             timeout=timeout,
             check=False,
+            # Çıktı ayrıştırması İngilizce biçime bağlı: yerelleştirmeyi sabitle.
+            env={**os.environ, "LC_ALL": "C", "LANG": "C"},
         )
     except subprocess.TimeoutExpired as exc:
         raise WifiError(f"nmcli zaman aşımına uğradı ({timeout}s): {' '.join(args[:3])}") from exc
@@ -307,7 +310,8 @@ class WifiManager:
             return None, ssid_hint
         for line in out.splitlines():
             parts = _split_terse(line.strip(), 3)
-            if parts and parts[0].lower() == "yes":
+            # LC_ALL=C normalde 'yes' veriri; eski yerel çıktı için 'evet' de kabul edilir
+            if parts and parts[0].lower() in {"yes", "evet", "*"}:
                 _, bssid, ssid = parts
                 return normalize_mac(bssid) or None, ssid or ssid_hint
         return None, ssid_hint

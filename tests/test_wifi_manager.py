@@ -190,6 +190,28 @@ def test_current_network_baglanti_yoksa_hata():
         mgr.current_network()
 
 
+@pytest.mark.parametrize("aktif", ["evet", "yes", "*"])
+def test_aktif_ap_yerel_veya_ingilizce_isaret_kabul_edilir(aktif):
+    satirlar = [
+        f"{aktif}:AA\\:BB\\:CC\\:DD\\:EE\\:FF:AgAdi",
+        "diger:11\\:22\\:33\\:44\\:55\\:66:DigerAg",
+    ]
+    out = "\n".join(satirlar) + "\n"
+
+    def runner(args: Sequence[str], timeout: int) -> str:
+        k = " ".join(args)
+        if "dev status" in k:
+            return DEV_STATUS
+        if "dev wifi list ifname" in k:
+            return out
+        return IP_CONFIG
+
+    mgr = WifiManager(runner=runner)
+    bssid, ssid = mgr._active_ap("wlp4s0", "AgAdi")
+    assert bssid == "AA:BB:CC:DD:EE:FF"
+    assert ssid == "AgAdi"
+
+
 def test_shell_true_kullanilmaz_ilmli_dogrulama():
     """Güvenlik sözleşmesi: argv listesi geçilmeli, metin komut asla."""
 

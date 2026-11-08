@@ -2,14 +2,14 @@
 
 Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her sprint sonunda çalışır bir çıktı hedeflenir.
 
-## Sprint 1 — Altyapı ve Bağlantı (Hafta 1)
+## Sprint 1 — Altyapı ve Bağlantı (Hafta 1) ✅
 **Hedef:** Terminalde `python -m netsentinel` ile bir Wi-Fi ağına bağlanıp SSID/gateway yazdırmak.
-- [ ] Dizin yapısı, `pyproject.toml`, sanal ortam, `.gitignore` (`config.yaml` dahil)
-- [ ] `models.py`: `Device`, `NetworkInfo`, `ScanResult`
-- [ ] `config.example.yaml` + YAML yükleyici ve doğrulama (pydantic veya manuel)
-- [ ] `wifi_manager.py`: tarama, profil eşleştirme, bağlanma, hata yönetimi
-- [ ] Root/izin kontrolü ve anlaşılır hata mesajları
-- [ ] Birim test: `nmcli` çıktısı ayrıştırma (örnek çıktıyla, gerçek ağ gerekmez)
+- [x] Dizin yapısı, `pyproject.toml`, sanal ortam, `.gitignore` (`config.yaml` dahil)
+- [x] `models.py`: `Device`, `NetworkInfo`, `ScanResult`
+- [x] `config.example.yaml` + YAML yükleyici ve doğrulama (pydantic veya manuel)
+- [x] `wifi_manager.py`: tarama, profil eşleştirme, bağlanma, hata yönetimi
+- [x] Root/izin kontrolü ve anlaşılır hata mesajları
+- [x] Birim test: `nmcli` çıktısı ayrıştırma (örnek çıktıyla, gerçek ağ gerekmez)
 
 ## Sprint 2 — Ağ Keşfi (Hafta 2)
 **Hedef:** Alt ağdaki cihazları IP/MAC olarak listelemek.
