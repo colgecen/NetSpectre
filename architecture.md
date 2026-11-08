@@ -65,10 +65,10 @@ class Device:
     ssdp_info: str | None = None
     open_ports: list[int] = field(default_factory=list)
     banners: dict[int, str] = field(default_factory=dict)
-    device_type: str = "unknown"      # router | phone | pc | camera | iot | unknown
-    risk_score: int = 0               # 0-100
+    device_type: str = "unknown"  # router | phone | pc | camera | iot | unknown
+    risk_score: int = 0  # 0-100
     risk_reasons: list[str] = field(default_factory=list)
-    trusted: bool = False             # beyaz listede mi
+    trusted: bool = False  # beyaz listede mi
     first_seen: datetime | None = None
     last_seen: datetime | None = None
 ```

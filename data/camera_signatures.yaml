@@ -1,0 +1,96 @@
+# NetSentinel kamera/IoT parmak izi kuralları (bkz. detection.md §1)
+# Alt dizeler küçük harfle yazılır; eşleştirme normalize (küçük harf, alt çizgi) ile yapılır.
+
+kamera_uretici:
+  - hikvision
+  - hangzhou hikvision
+  - dahua
+  - zhejiang dahua
+  - uniview
+  - reolink
+  - ezviz
+  - hangseng
+  - amcrest
+  - foscam
+  - axis communications
+  - are-controll
+  - bosch security
+  - hanwha
+  - tvt trivia
+  - novatek
+  - sigscan
+  - avtech
+
+iot_uretici:
+  - tuya
+  - espressif
+  - shanghai tuya
+  - xiaomi   # hem telefon hem IoT üreteci; tür ağacında IoT öncelikli değil
+  - tp-link systems
+  - wyze
+  - shenzhen iposs
+  - sonoff
+  - broadlink
+  - aelaic
+  - ikea
+  - signify   # Philips Hue
+
+telefon_uretici:
+  - apple
+  - samsung
+  - huawei
+  - oneplus
+  - google
+  - motorola
+  - xiaomi communications
+
+# Banner / HTTP başlığında aranacak kamera imzaları (büyük/küçük harf duyarsız)
+banner_imzalari:
+  - DNVRS-Webs
+  - uc-httpd
+  - Hikvision
+  - App-webs
+  - Boa/
+  - GoAhead-Webs
+  - IPCam
+  - NetworkCamera
+  - RTSP/1.0
+  - DVRIP
+  - WebServer
+  - LXUAC
+
+# Hostname kalıpları (küçük harf, alt çizgi/sonek tolere)
+hostname_kaliplari:
+  - ipcam
+  - ipc-
+  - cam-
+  - camera
+  - hikvision
+  - ezviz
+  - dahua
+  - esp_
+  - esp8266
+  - esp32
+
+# RTSP video akış portları
+rtsp_portlari: [554, 8554]
+
+# Kameraya özgü üretici portları (Hikvision/Dahua/XM özel)
+ozel_kamera_portlari: [8000, 37777, 34567]
+
+# ONVIF / MJPEG yaygın ama tek başına zayıf olasılık portları
+olasilik_portlari: [8899, 5000, 8081, 1935]
+
+# pc/server göstergesi yönetim portları
+pc_portlari: [22, 445, 3389]
+
+# mDNS servis sınıfları
+mdns_kamera_servisleri:
+  - _rtsp._tcp
+  - _onvif._tcp
+mdns_medya_servisleri:
+  - _airplay._tcp
+  - _googlecast._tcp
+  - _hap._tcp
+mdns_yazici_servisleri:
+  - _ipp._tcp
