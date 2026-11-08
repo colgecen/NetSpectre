@@ -43,7 +43,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] `report.py`: JSON + Markdown çıktı
 - [x] Taramalar arası fark: "yeni cihaz" uyarısı
 - [ ] Ubuntu, Debian, Arch, Kali'de test
-- [ ] `pip-audit`, `ruff`, `mypy` CI (GitHub Actions)
+- [x] `pip-audit`, `ruff`, `mypy` CI (GitHub Actions)
 - [ ] README ekran görüntüleri, kurulum doğrulama
 
 ## 🔮 Sonraki Sürümler (Backlog)
