@@ -125,7 +125,7 @@ class SahteNmcli:
             return WIFI_LIST
         if "dev wifi list ifname" in anahtar:
             return r"yes:AA\:BB\:CC\:00\:11\:22:EvAg_5G" + "\n"
-        if "con list" in anahtar:
+        if "con show" in anahtar:
             return "EvAg_5G:EvAg_5G\nEvAg_2.4G:EvAg_2.4G\n"
         if "dev status" in anahtar:
             return DEV_STATUS
@@ -221,3 +221,14 @@ def test_shell_true_kullanilmaz_ilmli_dogrulama():
 
     mgr = WifiManager(runner=runner)
     mgr.scan()
+
+
+def test_saved_profiles_modern_nmcli_kullanir():
+    """Regresyon: eski 'con list' sözdizimi modern nmcli'de hata veriyordu."""
+    sahte = SahteNmcli()
+    mgr = WifiManager(runner=sahte)
+    profiller = mgr.saved_profiles()
+    assert profiller == {"EvAg_5G": "EvAg_5G", "EvAg_2.4G": "EvAg_2.4G"}
+    cagri = next(c for c in sahte.cagrilan if "con" in c)
+    assert "show" in cagri
+    assert "list" not in cagri

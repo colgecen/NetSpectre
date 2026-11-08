@@ -123,7 +123,7 @@ def parse_dev_status(text: str) -> list[dict[str, str]]:
 
 
 def parse_saved_profiles(text: str) -> dict[str, str]:
-    """``nmcli -t -f NAME,SSID con list`` → {ssid: profil_adı}.
+    """``nmcli -t -f NAME,SSID con show`` → {ssid: profil_adı}.
 
     Bir profilin SSID alanı birden çok ağ içerebilir; ilk (birincil) SSID kullanılır.
     """
@@ -238,7 +238,8 @@ class WifiManager:
 
     def saved_profiles(self) -> dict[str, str]:
         """Kayıtlı NetworkManager profilleri: {ssid: profil_adı}."""
-        return parse_saved_profiles(self._run(["-t", "-f", "NAME,SSID", "con", "list"], 10))
+        # nmcli'de 'con list' eski söz dizimidir; modern sürüm 'con show' ister.
+        return parse_saved_profiles(self._run(["-t", "-f", "NAME,SSID", "con", "show"], 10))
 
     def dev_status(self) -> list[dict[str, str]]:
         return parse_dev_status(
