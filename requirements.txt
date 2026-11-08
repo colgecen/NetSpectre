@@ -1,0 +1,11 @@
+# Ağ keşfi ve analiz
+scapy>=2.5.0
+python-nmap>=0.7.1
+zeroconf>=0.130.0
+textual>=0.60.0
+rich>=13.7.0
+
+# Yapılandırma ve gizlilik
+pyyaml>=6.0.1
+pydantic>=2.5.0
+keyring>=24.0.0
