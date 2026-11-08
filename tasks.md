@@ -11,14 +11,14 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] Root/izin kontrolü ve anlaşılır hata mesajları
 - [x] Birim test: `nmcli` çıktısı ayrıştırma (örnek çıktıyla, gerçek ağ gerekmez)
 
-## Sprint 2 — Ağ Keşfi (Hafta 2)
+## Sprint 2 — Ağ Keşfi (Hafta 2) ✅
 **Hedef:** Alt ağdaki cihazları IP/MAC olarak listelemek.
-- [ ] Alt ağ (CIDR) tespiti
-- [ ] `discovery/arp.py`: Scapy ARP taraması, zaman aşımı ve yeniden deneme
-- [ ] `discovery/mdns.py`: zeroconf `ServiceBrowser` ile servis dinleme
-- [ ] `discovery/ssdp.py`: M-SEARCH + NOTIFY dinleme
-- [ ] Kaynakları IP/MAC ile birleştiren `merge_devices()`
-- [ ] Pasif mod (`--passive`)
+- [x] Alt ağ (CIDR) tespiti
+- [x] `discovery/arp.py`: Scapy ARP taraması, zaman aşımı ve yeniden deneme
+- [x] `discovery/mdns.py`: zeroconf `ServiceBrowser` ile servis dinleme
+- [x] `discovery/ssdp.py`: M-SEARCH + NOTIFY dinleme
+- [x] Kaynakları IP/MAC ile birleştiren `merge_devices()`
+- [x] Pasif mod (`--passive`)
 
 ## Sprint 3 — Kimliklendirme ve Analiz (Hafta 3)
 **Hedef:** Her cihaz için tür tahmini ve risk puanı.

@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 
 from netsentinel import __version__
 from netsentinel.config import AppConfig, ConfigError, check_file_permissions, load_config
-from netsentinel.models import NetworkInfo
+from netsentinel.discovery.scan import kesfet
+from netsentinel.models import Device, NetworkInfo, ScanResult
 from netsentinel.permissions import (
     PermissionStatus,
     check_permissions,
@@ -61,14 +63,37 @@ def _yazdir(info: NetworkInfo) -> None:
     print(f"  BSSID   : {info.bssid or '—'}")
     print(f"  Ağ geçidi: {info.gateway or '—'}")
     print(f"  Alt ağ  : {info.cidr or '—'}")
-    if info.cidr:
-        print(f"  Taranacak IP sayısı: {max(len(info.hosts()), 0)}")
+
+
+def _cihaz_tablosu(cihazlar: list[Device]) -> None:
+    from rich.console import Console
+    from rich.table import Table
+
+    tablo = Table(title=f"Keşfedilen cihazlar ({len(cihazlar)})")
+    tablo.add_column("IP", style="cyan", no_wrap=True)
+    tablo.add_column("MAC", style="magenta")
+    tablo.add_column("Hostname")
+    tablo.add_column("Servisler / SSDP", overflow="fold")
+    for c in sorted(cihazlar, key=lambda d: _ip_sirasi(d.ip)):
+        servis = ", ".join(c.mdns_services) or (c.ssdp_info or "—")
+        tablo.add_row(c.ip or "—", c.mac or "?", c.hostname or "—", servis)
+    Console().print(tablo)
+
+
+def _ip_sirasi(ip: str) -> tuple[int, ...]:
+    import ipaddress
+
+    try:
+        return tuple(ipaddress.ip_address(ip).packed)
+    except ValueError:
+        return (255,)
 
 
 def run(
     argv: list[str] | None = None,
     wifi_manager: WifiManager | None = None,
     permission_status: PermissionStatus | None = None,
+    kesif_fn: Callable[..., tuple[ScanResult, object]] = kesfet,
 ) -> int:
     """Uygulama akışı; bağımlılıklar testte enjekte edilebilir."""
     args = build_parser().parse_args(argv)
@@ -108,10 +133,11 @@ def run(
         return 1
 
     _yazdir(info)
-    print(
-        "\n✅ Sprint 1 aşaması: keşif Sprint 2'de eklenecek. "
-        f"(mod={cfg.scan.mode}, yürütme={durum.mode_label})"
-    )
+    print(f"\n🔎 Keşif sürüyor (mod={cfg.scan.mode}, yürütme={durum.mode_label}) …")
+    sonuc, _rapor = kesif_fn(info, cfg.scan)
+    _cihaz_tablosu(sonuc.devices)
+    ozet = sonuc.summary()
+    print(f"\n✅ {ozet['total']} cihaz keşfedildi. Analiz/risk puanı Sprint 3'te eklenecek.")
     return 0
 
 

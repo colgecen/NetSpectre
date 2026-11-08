@@ -3,12 +3,19 @@
 import pytest
 
 from netsentinel.__main__ import build_parser, run
-from netsentinel.models import NetworkInfo
+from netsentinel.discovery.scan import KesifRaporu
+from netsentinel.models import NetworkInfo, ScanResult
 from netsentinel.permissions import PermissionStatus
 from netsentinel.wifi_manager import WifiError
 
 ROOT_YETKI = PermissionStatus(is_root=True, has_net_raw=True, has_net_admin=True)
 PASIF_YETKI = PermissionStatus(is_root=False, has_net_raw=False, has_net_admin=False)
+
+
+def bos_kesif(network, scan_cfg, **kwargs):
+    """Testlerde gerçek mDNS/SSDP dinlemeyi atla."""
+    return ScanResult(network=network, devices=[]), KesifRaporu()
+
 
 CFG = """
 wifi:
@@ -73,7 +80,12 @@ class TestParser:
 class TestRun:
     def test_baglanip_bilgi_yazdirir(self, cfg_dosyasi, capsys):
         mgr = SahteMgr()
-        kod = run(["--config", cfg_dosyasi], wifi_manager=mgr, permission_status=ROOT_YETKI)
+        kod = run(
+            ["--config", cfg_dosyasi],
+            wifi_manager=mgr,
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+        )
         out = capsys.readouterr().out
         assert kod == 0
         assert "EvAg_5G" in out and "192.168.1.1" in out and "192.168.1.42/24" in out
@@ -85,6 +97,7 @@ class TestRun:
             ["--config", cfg_dosyasi, "--no-connect", "--iface", "wlan9"],
             wifi_manager=mgr,
             permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
         )
         assert kod == 0
         assert mgr.connect_cagrilan == []
@@ -96,6 +109,7 @@ class TestRun:
             ["--config", cfg_dosyasi, "--passive"],
             wifi_manager=mgr,
             permission_status=PASIF_YETKI,
+            kesif_fn=bos_kesif,
         )
         # yetkisiz kullanıcı + pasif mod → hata değil (aktif tarama yok)
         assert kod == 0
@@ -103,7 +117,12 @@ class TestRun:
 
     def test_aktif_mod_yetkisiz_kullanici_1_doner(self, cfg_dosyasi, capsys):
         mgr = SahteMgr()
-        kod = run(["--config", cfg_dosyasi], wifi_manager=mgr, permission_status=PASIF_YETKI)
+        kod = run(
+            ["--config", cfg_dosyasi],
+            wifi_manager=mgr,
+            permission_status=PASIF_YETKI,
+            kesif_fn=bos_kesif,
+        )
         assert kod == 1
         assert "setcap" in capsys.readouterr().err
 
@@ -112,13 +131,19 @@ class TestRun:
             ["--config", str(tmp_path / "yok.yaml")],
             wifi_manager=SahteMgr(),
             permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
         )
         assert kod == 2
         assert "config.example.yaml" in capsys.readouterr().err
 
     def test_wifi_hatasi_kod_1(self, cfg_dosyasi, capsys):
         mgr = SahteMgr(hata=True)
-        kod = run(["--config", cfg_dosyasi], wifi_manager=mgr, permission_status=ROOT_YETKI)
+        kod = run(
+            ["--config", cfg_dosyasi],
+            wifi_manager=mgr,
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+        )
         assert kod == 1
         assert "menzil yok" in capsys.readouterr().err
 
@@ -137,5 +162,6 @@ class TestRun:
             ["--config", cfg_dosyasi, "--rate", "7"],
             wifi_manager=mgr,
             permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
         )
         assert gorulen["rate"] == 7  # config'deki 40 yerine bayrak değeri
