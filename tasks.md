@@ -42,7 +42,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 **Hedef:** Paylaşılabilir ilk sürüm (v0.1).
 - [x] `report.py`: JSON + Markdown çıktı
 - [x] Taramalar arası fark: "yeni cihaz" uyarısı
-- [ ] Ubuntu, Debian, Arch, Kali'de test
+- [x] Ubuntu, Debian, Arch, Kali'de test
 - [x] `pip-audit`, `ruff`, `mypy` CI (GitHub Actions)
 - [ ] README ekran görüntüleri, kurulum doğrulama
 
