@@ -32,11 +32,11 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 
 ## Sprint 4 — TUI (Hafta 4)
 **Hedef:** Canlı güncellenen, renk kodlu panel.
-- [ ] Textual ana ekran: başlık çubuğu (SSID, cihaz sayısı, şüpheli sayısı)
-- [ ] Cihaz tablosu (sıralama, filtre: yalnızca şüpheli)
-- [ ] Cihaz detay paneli (portlar, banner, risk nedenleri)
-- [ ] Tarama animasyonu/ilerleme göstergesi
-- [ ] Klavye kısayolları: `r` yeniden tara, `w` beyaz listeye ekle, `e` dışa aktar, `q` çık
+- [x] Textual ana ekran: başlık çubuğu (SSID, cihaz sayısı, şüpheli sayısı)
+- [x] Cihaz tablosu (sıralama, filtre: yalnızca şüpheli)
+- [x] Cihaz detay paneli (portlar, banner, risk nedenleri)
+- [x] Tarama animasyonu/ilerleme göstergesi
+- [x] Klavye kısayolları: `r` yeniden tara, `w` beyaz listeye ekle, `e` dışa aktar, `q` çık
 
 ## Sprint 5 — Rapor, Test ve Sertleştirme (Hafta 5)
 **Hedef:** Paylaşılabilir ilk sürüm (v0.1).
