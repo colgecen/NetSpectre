@@ -11,6 +11,8 @@ import argparse
 import sys
 from collections.abc import Callable
 
+from rich.console import Console
+
 from netsentinel import __version__, report
 from netsentinel.analyzer import cihazlari_analiz_et
 from netsentinel.config import AppConfig, ConfigError, check_file_permissions, load_config
@@ -74,11 +76,11 @@ def _yazdir(info: NetworkInfo) -> None:
 _SEVIYE_STIL = {"yesil": "green", "dikkat": "yellow", "supheli": "bold red"}
 
 
-def _cihaz_tablosu(sonuc: ScanResult) -> None:
-    from rich.console import Console
+def _cihaz_tablosu(sonuc: ScanResult, konsol: Console | None = None) -> None:
     from rich.table import Table
     from rich.text import Text
 
+    konsol = konsol or Console()
     cihazlar = sonuc.sorted_by_risk()
     tablo = Table(title=f"Keşfedilen cihazlar ({len(cihazlar)})")
     tablo.add_column("IP", style="cyan", no_wrap=True)
@@ -98,16 +100,15 @@ def _cihaz_tablosu(sonuc: ScanResult) -> None:
             c.device_type,
             Text(str(c.risk_score), style=_SEVIYE_STIL[c.risk_level.value]),
         )
-    Console().print(tablo)
+    konsol.print(tablo)
 
     supheli = sonuc.suspicious
     if supheli:
-        console = Console()
-        console.print("\n[bold red]⚠️  Şüpheli cihazlar:[/]")
+        konsol.print("\n[bold red]⚠️  Şüpheli cihazlar:[/]")
         for c in supheli:
-            console.print(f"  • [red]{c.ip} ({c.mac})[/red] — {c.risk_score} puan")
+            konsol.print(f"  • [red]{c.ip} ({c.mac})[/red] — {c.risk_score} puan")
             for gerekce in c.risk_reasons:
-                console.print(f"      [dim]- {gerekce}[/dim]")
+                konsol.print(f"      [dim]- {gerekce}[/dim]")
 
 
 def _tui_hazirla(

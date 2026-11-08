@@ -44,7 +44,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] Taramalar arası fark: "yeni cihaz" uyarısı
 - [x] Ubuntu, Debian, Arch, Kali'de test
 - [x] `pip-audit`, `ruff`, `mypy` CI (GitHub Actions)
-- [ ] README ekran görüntüleri, kurulum doğrulama
+- [x] README ekran görüntüleri, kurulum doğrulama
 
 ## 🔮 Sonraki Sürümler (Backlog)
 - [ ] Sürekli izleme modu + yeni cihazda masaüstü/Telegram bildirimi
