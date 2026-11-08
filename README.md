@@ -151,16 +151,23 @@ Har makineye tek dosya taşımak istersen repo kökündeki `netspectre` betiği 
 ile kendi- kendine yeten Linux paketi üretir (imza/OUI verileri pakete gömülüdür):
 
 ```bash
-./netspectre linux appimage     # build/NetSpectre.AppImage (~41 MB, tüm dağıtımlar)
-./netspectre linux targz        # build/netspectre_Linux_x86_64.tar.gz
-./netspectre --install          # her klasörden 'netspectre' yazmak için ~/.local/bin'e bağ kur
+./netspectre linux appimage   # build/NetSpectre.AppImage (~41 MB, tüm dağıtımlar)
+./netspectre linux targz      # build/netspectre_Linux_x86_64.tar.gz
+./netspectre --install        # iki komutu kurar
 ```
 
-`./netspectre` yazınca interaktif menü açılır. AppImage'ı çalıştırmadan önce
-`chmod +x NetSpectre.AppImage` yeterlidir. Etkin mod (ARP) ham paket yetkisi
-istediğinden AppImage içinde `sudo ./NetSpectre.AppImage …` ile çalıştırılır;
-`--passive` ve TUI yetkisiz çalışır. Windows/macOS paketleme güvenilir çapraz derleme
-olanağı olmadığı için desteklenmez.
+`./netspectre` yazınca interaktif menü açılır. `--install` ise PATH'te iki komut
+kurar — adları birbirine karışmasın:
+
+| Komut | Ne yapar |
+|---|---|
+| `netspectre` | Paketleme menüsü (derle/dağıt — bu betik) |
+| `net-spectre` | Uygulama; argümansız çalışınca terminal arayüzü (TUI) açılır |
+
+AppImage'ı çalıştırmadan önce `chmod +x NetSpectre.AppImage` yeterlidir. Etkin mod
+(ARP) ham paket yetkisi istediğinden AppImage içinde `sudo …` ile çalıştırılır veya
+`--passive` kullanılır; arayüz yetki yoksa **kendiliğinden pasif moda düşer**.
+Windows/macOS paketleme güvenilir çapraz derleme olanağı olmadığı için desteklenmez.
 
 ### Uyumluluk
 

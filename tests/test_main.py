@@ -202,6 +202,27 @@ class TestRun:
         assert isinstance(app, NetSentinelApp)
         assert app._aktif_ssid == "EvAg_5G"
 
+    def test_tui_yetkisizse_pasif_moda_duser_hata_vermez(self, cfg_dosyasi, capsys):
+        seen: dict = {}
+
+        def sahte_tui(app):
+            seen["ok"] = True
+            return 0
+
+        # PASIF_YETKI: root değil, CAP_NET yok — aktif tarama yapamaz.
+        kod = run(
+            ["--config", cfg_dosyasi, "--tui", "--no-connect"],
+            wifi_manager=SahteMgr(),
+            permission_status=PASIF_YETKI,
+            kesif_fn=bos_kesif,
+            tui_fn=sahte_tui,
+        )
+        assert kod == 0
+        assert seen.get("ok") is True
+        cikan = capsys.readouterr()
+        assert "PASİF modda" in cikan.err
+        assert "mod=passive" in cikan.out
+
 
 def iki_cihazli_kesif(network, scan_cfg, **kwargs):
     from netsentinel.models import Device, ScanResult

@@ -7,8 +7,9 @@
 #   ./netspectre linux appimage      -> direkt AppImage derle
 #   ./netspectre linux targz         -> tar.gz dağıtım paketi
 #   ./netspectre linux binary        -> PyInstaller onedir çıktısı
-#   ./netspectre --install           -> ~/.local/bin'e sembolik bag kur,
-#                                        sonra her klasörden `netspectre` yaz
+#   ./netspectre --install           -> iki komut kur (~/.local/bin):
+#                                        'netspectre'  = bu paketleme menusu
+#                                        'net-spectre' = uygulama (argsiz TUI)
 #   ./netspectre --list              -> hedefleri listele
 #   ./netspectre --help              -> yardim
 #
@@ -43,7 +44,7 @@ usage() {
   echo "Kullanim:"
   echo "  ./netspectre                 Interaktif menü"
   echo "  ./netspectre linux <format>  Direkt derle"
-  echo "  ./netspectre --install       Komutu sisteme kur (her yerden 'netspectre')"
+  echo "  ./netspectre --install       Iki komut kur: 'netspectre' (menu) + 'net-spectre' (uygulama)"
   echo "  ./netspectre --list          Hedefleri listele"
   echo "  ./netspectre --help          Bu yardim"
   echo
@@ -70,21 +71,38 @@ python_bin() {
 }
 
 do_install() {
-  local bindir="$HOME/.local/bin" hedef=""
+  local bindir="$HOME/.local/bin"
   mkdir -p "$bindir"
-  # Önce PyInstaller çıktısı, yoksa venv konsol betiği
+
+  # 1) netspectre  -> paketleme menüsü (bu betiğin kendisi)
+  ln -sf "$ROOT/netspectre" "$bindir/netspectre"
+  echo "Kuruldu: $bindir/netspectre  -> paketleme araci (menu)"
+
+  # 2) net-spectre -> uygulama (TUI). Argsiz calisirsa arayuzu acar.
+  local hedef=""
   if [ -x "$ROOT/build/pyi/netspectre/netspectre" ]; then
     hedef="$ROOT/build/pyi/netspectre/netspectre"
-  elif [ -x "$ROOT/.venv/bin/netspectre" ]; then
-    hedef="$ROOT/.venv/bin/netspectre"
+  elif [ -x "$ROOT/.venv/bin/netsentinel" ]; then
+    hedef="$ROOT/.venv/bin/netsentinel"
   else
-    echo "Once kurulum/derleme gerekir: pip install -e .  veya  ./netspectre linux binary"
-    exit 1
+    echo "UYARI: uygulama ikilisi yok; once derle: ./netspectre linux binary"
   fi
-  ln -sf "$hedef" "$bindir/netspectre"
-  echo "Kuruldu: $bindir/netspectre -> $hedef"
+  if [ -n "$hedef" ]; then
+    cat > "$bindir/net-spectre" << WRAP
+#!/usr/bin/env bash
+# NetSentinel uygulamasi — argsiz: terminal arayuzu (TUI).
+BIN="$hedef"
+if [ \$# -eq 0 ]; then
+  exec "\$BIN" --tui --no-connect
+fi
+exec "\$BIN" "\$@"
+WRAP
+    chmod +x "$bindir/net-spectre"
+    echo "Kuruldu: $bindir/net-spectre -> uygulama ($hedef)"
+  fi
+
   case ":$PATH:" in
-    *":$bindir:"*) echo "PATH zaten '$bindir' iceriyor. Artik her klasorden 'netspectre' yazabilirsin." ;;
+    *":$bindir:"*) echo "PATH tamam. Artik her klasorden: 'netspectre' (menu), 'net-spectre' (uygulama)." ;;
     *)
       echo "NOT: '$bindir' PATH'te yok. Su satiri ~/.bashrc'ye ekle:"
       echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""

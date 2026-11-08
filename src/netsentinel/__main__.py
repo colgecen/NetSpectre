@@ -165,6 +165,14 @@ def run(
     durum = permission_status if permission_status is not None else check_permissions()
     for w in durum.warnings:
         print(w, file=sys.stderr)
+    if cfg.scan.mode == "active" and args.tui and not durum.can_scan:
+        # TUI asla yetki hatasıyla açılmadan kapanmasın: pasife düş, bildir.
+        cfg.scan.mode = "passive"
+        print(
+            "⚠️  ARP yetkisi yok — arayüz PASİF modda açılıyor "
+            "(tam tarama için: sudo ile çalıştır).",
+            file=sys.stderr,
+        )
     if cfg.scan.mode == "active":
         try:
             ensure_scan_permissions(durum)
