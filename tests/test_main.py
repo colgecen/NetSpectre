@@ -136,6 +136,19 @@ class TestRun:
         assert kod == 2
         assert "config.example.yaml" in capsys.readouterr().err
 
+    def test_varsayilan_config_yoksa_yerlesik_degerlerle_calisir(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        monkeypatch.chdir(tmp_path)  # dizinde config.yaml yok
+        kod = run(
+            ["--no-connect"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+        )
+        assert kod == 0
+        assert "EvAg_5G" in capsys.readouterr().out
+
     def test_wifi_hatasi_kod_1(self, cfg_dosyasi, capsys):
         mgr = SahteMgr(hata=True)
         kod = run(

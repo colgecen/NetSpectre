@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 from rich.console import Console
 
@@ -26,12 +27,13 @@ from netsentinel.permissions import (
 from netsentinel.wifi_manager import WifiError, WifiManager
 
 _ACIKLAMA = "Kendi Wi-Fi ağınızdaki gizli kamera ve bilinmeyen IoT cihazlarını tespit eder."
+_VARSAYILAN_CONFIG = "config.yaml"
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="netsentinel", description=_ACIKLAMA)
     p.add_argument("--version", action="version", version=f"NetSentinel {__version__}")
-    p.add_argument("--config", default="config.yaml", help="yapılandırma dosyası yolu")
+    p.add_argument("--config", default=_VARSAYILAN_CONFIG, help="yapılandırma dosyası yolu")
     p.add_argument(
         "--passive",
         action="store_true",
@@ -139,7 +141,12 @@ def run(
     args = build_parser().parse_args(argv)
 
     try:
-        cfg = load_config(args.config)
+        # Varsayılan ad aranıyorsa ve yoksa yerleşik değerlerle devam et;
+        # --config açıkça belirtilmişse dosya zorunlu.
+        if args.config == _VARSAYILAN_CONFIG and not Path(args.config).exists():
+            cfg = AppConfig()
+        else:
+            cfg = load_config(args.config)
     except ConfigError as exc:
         print(f"❌ {exc}", file=sys.stderr)
         return 2
