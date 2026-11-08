@@ -11,11 +11,11 @@ import argparse
 import sys
 from collections.abc import Callable
 
-from netsentinel import __version__
+from netsentinel import __version__, report
 from netsentinel.analyzer import cihazlari_analiz_et
 from netsentinel.config import AppConfig, ConfigError, check_file_permissions, load_config
 from netsentinel.discovery.scan import kesfet
-from netsentinel.models import NetworkInfo, ScanResult
+from netsentinel.models import Device, NetworkInfo, ScanResult
 from netsentinel.permissions import (
     PermissionStatus,
     check_permissions,
@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--export",
         choices=["json", "md"],
-        help="sonucu dosyaya yaz (Sprint 5'te etkinleşecek)",
+        help="sonucu JSON/Markdown olarak rapor dizinine yaz",
     )
     p.add_argument("--rate", type=int, help="port taraması paket/sn sınırı")
     p.add_argument("--anonymize", action="store_true", help="raporda IP/MAC maskele")
@@ -181,13 +181,43 @@ def run(
     sonuc, _rapor = kesif_fn(info, cfg.scan)
     print("🧠 Cihazlar analiz ediliyor (OUI + imzalar + puanlama) …")
     cihazlari_analiz_et(sonuc, whitelist=cfg.whitelisted_macs, gateway_ip=info.gateway)
+    yeni = _oncekiyle_karsilastir(sonuc, cfg)
     _cihaz_tablosu(sonuc)
+    if yeni:
+        print(f"\n🆕 Önceki taramaya göre {len(yeni)} YENİ cihaz:")
+        for c in yeni:
+            print(f"  • {c.ip} ({c.mac}) — {c.device_type} [{c.risk_score} puan]")
+    _disa_aktar(sonuc, args, cfg)
     ozet = sonuc.summary()
+    yeni_not = f", {ozet['yeni']} yeni" if ozet["yeni"] else ""
     print(
         f"\n✅ {ozet['total']} cihaz: {ozet['suspicious']} şüpheli, "
-        f"{ozet['attention']} dikkat, {ozet['trusted']} güvenilir."
+        f"{ozet['attention']} dikkat, {ozet['trusted']} güvenilir{yeni_not}."
     )
     return 0
+
+
+def _oncekiyle_karsilastir(sonuc: ScanResult, cfg: AppConfig) -> list[Device]:
+    """Son JSON rapora göre yeni cihazları işaretler; rapor yoksa boş liste."""
+    onceki_yol = report.son_rapor(cfg.output.directory)
+    if onceki_yol is None:
+        return []
+    anahtarlar, anonim = report.kayıtlı_anahtarlar(onceki_yol)
+    if not anahtarlar:
+        return []
+    return report.yeni_cihazları_işaretle(sonuc, anahtarlar, önceki_anonim=anonim)
+
+
+def _disa_aktar(sonuc: ScanResult, args: argparse.Namespace, cfg: AppConfig) -> None:
+    if not args.export:
+        return
+    yol = report.yaz(
+        sonuc,
+        args.export,
+        dizin=cfg.output.directory,
+        anonymize=cfg.output.anonymize,
+    )
+    print(f"\n💾 Rapor yazıldı: {yol}")
 
 
 def main(argv: list[str] | None = None) -> None:

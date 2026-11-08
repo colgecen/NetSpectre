@@ -188,3 +188,79 @@ class TestRun:
         app = gorulen["app"]
         assert isinstance(app, NetSentinelApp)
         assert app._aktif_ssid == "EvAg_5G"
+
+
+def iki_cihazli_kesif(network, scan_cfg, **kwargs):
+    from netsentinel.models import Device, ScanResult
+
+    r = ScanResult(network=network)
+    r.add_device(
+        Device(
+            ip="192.168.1.50",
+            mac="0C:75:D2:AA:BB:CC",
+            open_ports=[554, 8000],
+            device_type="camera",
+            risk_score=100,
+            risk_reasons=["RTSP portu açık (video akışı)"],
+        )
+    )
+    r.add_device(Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="laptop"))
+    return r, KesifRaporu()
+
+
+class TestRaporAkisi:
+    def _cfg_dizin(self, tmp_path):
+        dizin = tmp_path / "raporlar"
+        yol = tmp_path / "config.yaml"
+        yol.write_text(
+            f'wifi:\n  preferred: ["EvAg_5G"]\noutput:\n  directory: "{dizin}"\n',
+            encoding="utf-8",
+        )
+        yol.chmod(0o600)
+        return str(yol), dizin
+
+    def test_export_json_rapor_dosyasi_olusur(self, tmp_path, capsys):
+        cfg, dizin = self._cfg_dizin(tmp_path)
+        kod = run(
+            ["--config", cfg, "--no-connect", "--export", "json"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=iki_cihazli_kesif,
+        )
+        assert kod == 0
+        assert "Rapor yazıldı" in capsys.readouterr().out
+        assert len(list(dizin.glob("netsentinel-*.json"))) == 1
+
+    def test_export_anonim_kimlikleri_gizler(self, tmp_path):
+        cfg, dizin = self._cfg_dizin(tmp_path)
+        run(
+            ["--config", cfg, "--no-connect", "--export", "json", "--anonymize"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=iki_cihazli_kesif,
+        )
+        icerik = next(iter(dizin.glob("netsentinel-*.json"))).read_text(encoding="utf-8")
+        assert "0C:75:D2:AA:BB:CC" not in icerik
+        assert "MAC-" in icerik
+
+    def test_onceki_rapora_gore_yeni_cihaz_uyarisi(self, tmp_path, capsys):
+        from netsentinel import report
+        from netsentinel.models import Device, ScanResult
+
+        cfg, dizin = self._cfg_dizin(tmp_path)
+        dizin.mkdir(parents=True)
+        onceki = ScanResult(network=AG_BILGISI)
+        onceki.add_device(Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="laptop"))
+        report.yaz(onceki, "json", dizin=dizin)
+
+        kod = run(
+            ["--config", cfg, "--no-connect"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=iki_cihazli_kesif,
+        )
+        out = capsys.readouterr().out
+        assert kod == 0
+        assert "YENİ cihaz" in out
+        assert "0C:75:D2:AA:BB:CC" in out  # kamera yeni
+        assert "11:AA:22:BB:33:CC" not in out.split("YENİ")[1]  # laptop yeni değil
