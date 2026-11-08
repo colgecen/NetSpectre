@@ -20,7 +20,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] Kaynakları IP/MAC ile birleştiren `merge_devices()`
 - [x] Pasif mod (`--passive`)
 
-## Sprint 3 — Kimliklendirme ve Analiz (Hafta 3)
+## Sprint 3 — Kimliklendirme ve Analiz (Hafta 3) ✅
 **Hedef:** Her cihaz için tür tahmini ve risk puanı.
 - [x] Yerel OUI veritabanı (`data/oui.json`) + güncelleme betiği
 - [x] `analyzer/ports.py`: hız sınırlı nmap taraması (yalnızca hedef portlar)
@@ -30,7 +30,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] Beyaz liste mantığı
 - [x] Birim testler: bilinen kamera/IoT/telefon örnekleriyle
 
-## Sprint 4 — TUI (Hafta 4)
+## Sprint 4 — TUI (Hafta 4) ✅
 **Hedef:** Canlı güncellenen, renk kodlu panel.
 - [x] Textual ana ekran: başlık çubuğu (SSID, cihaz sayısı, şüpheli sayısı)
 - [x] Cihaz tablosu (sıralama, filtre: yalnızca şüpheli)
@@ -38,7 +38,7 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 - [x] Tarama animasyonu/ilerleme göstergesi
 - [x] Klavye kısayolları: `r` yeniden tara, `w` beyaz listeye ekle, `e` dışa aktar, `q` çık
 
-## Sprint 5 — Rapor, Test ve Sertleştirme (Hafta 5)
+## Sprint 5 — Rapor, Test ve Sertleştirme (Hafta 5) ✅
 **Hedef:** Paylaşılabilir ilk sürüm (v0.1).
 - [x] `report.py`: JSON + Markdown çıktı
 - [x] Taramalar arası fark: "yeni cihaz" uyarısı
