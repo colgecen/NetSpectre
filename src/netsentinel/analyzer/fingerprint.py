@@ -14,10 +14,10 @@ from typing import Any
 
 import yaml
 
+from netsentinel.data_paths import data_dizini
 from netsentinel.models import Device, DeviceType
 
-PAKET_KOKU = Path(__file__).resolve().parents[3]
-VARSAYILAN_IMZA_YOLU = PAKET_KOKU / "data" / "camera_signatures.yaml"
+VARSAYILAN_IMZA_YOLU = data_dizini() / "camera_signatures.yaml"
 
 _LISTE_ALANLARI = (
     "kamera_uretici",

@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 IEEE_URL = "https://standards-oui.ieee.org/oui/oui.txt"
-VARSAYILAN_CIKTI = Path(__file__).resolve().parents[1] / "data" / "oui.json"
+VARSAYILAN_CIKTI = Path(__file__).resolve().parents[1] / "src" / "netsentinel" / "data" / "oui.json"
 
 # Satır biçimi: 'AA-AA-AA   (hex)\t\tÜretici Adı'
 _OUI_SATIRI = re.compile(

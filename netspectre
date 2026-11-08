@@ -1,0 +1,353 @@
+#!/usr/bin/env bash
+#
+# netspectre — NetSentinel paketleme aracı (Python / PyInstaller)
+#
+# Kullanim:
+#   ./netspectre                     -> interaktif menü (format sec -> derle)
+#   ./netspectre linux appimage      -> direkt AppImage derle
+#   ./netspectre linux targz         -> tar.gz dağıtım paketi
+#   ./netspectre linux binary        -> PyInstaller onedir çıktısı
+#   ./netspectre --install           -> ~/.local/bin'e sembolik bag kur,
+#                                        sonra her klasörden `netspectre` yaz
+#   ./netspectre --list              -> hedefleri listele
+#   ./netspectre --help              -> yardim
+#
+# Not: Python projelerinde Windows/macOS'a çapraz derleme güvenilir değildir;
+#      hedef yalnızca Linux'tur (AppImage her dağıtımda çalışır).
+#
+set -euo pipefail
+
+VERSION="${VERSION:-0.1.0}"
+
+resolve_root() {
+  local src="${BASH_SOURCE[0]}"
+  while [ -L "$src" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+ROOT="$(resolve_root)"
+
+banner() {
+  echo "=============================================="
+  echo "  NetSentinel — netspectre paketleme araci  v$VERSION"
+  echo "=============================================="
+}
+
+usage() {
+  banner
+  echo
+  echo "Kullanim:"
+  echo "  ./netspectre                 Interaktif menü"
+  echo "  ./netspectre linux <format>  Direkt derle"
+  echo "  ./netspectre --install       Komutu sisteme kur (her yerden 'netspectre')"
+  echo "  ./netspectre --list          Hedefleri listele"
+  echo "  ./netspectre --help          Bu yardim"
+  echo
+  echo "Hedefler (yalniz Linux):"
+  echo "  appimage (.AppImage, tüm dağıtımlar) | targz (.tar.gz) | binary (onedir dizini)"
+  echo
+  echo "Ornekler:"
+  echo "  ./netspectre linux appimage"
+  echo "  VERSION=1.0.0 ./netspectre linux targz"
+}
+
+list_targets() {
+  echo "linux   : appimage (.AppImage) | targz (.tar.gz) | binary (onedir dizini)"
+  echo "windows : desteklenmiyor (Python capraz derleme guvenilir degil)"
+  echo "macos   : desteklenmiyor"
+}
+
+python_bin() {
+  if [ -x "$ROOT/.venv/bin/python" ]; then
+    echo "$ROOT/.venv/bin/python"
+  else
+    command -v python3
+  fi
+}
+
+do_install() {
+  local bindir="$HOME/.local/bin" hedef=""
+  mkdir -p "$bindir"
+  # Önce PyInstaller çıktısı, yoksa venv konsol betiği
+  if [ -x "$ROOT/build/pyi/netspectre/netspectre" ]; then
+    hedef="$ROOT/build/pyi/netspectre/netspectre"
+  elif [ -x "$ROOT/.venv/bin/netspectre" ]; then
+    hedef="$ROOT/.venv/bin/netspectre"
+  else
+    echo "Once kurulum/derleme gerekir: pip install -e .  veya  ./netspectre linux binary"
+    exit 1
+  fi
+  ln -sf "$hedef" "$bindir/netspectre"
+  echo "Kuruldu: $bindir/netspectre -> $hedef"
+  case ":$PATH:" in
+    *":$bindir:"*) echo "PATH zaten '$bindir' iceriyor. Artik her klasorden 'netspectre' yazabilirsin." ;;
+    *)
+      echo "NOT: '$bindir' PATH'te yok. Su satiri ~/.bashrc'ye ekle:"
+      echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+      echo "Sonra yeni terminal ac ya da: source ~/.bashrc"
+      ;;
+  esac
+}
+
+# fetch_appimagetool / fetch_appimage_runtime — musicle derlemesinden uyarlandi:
+# PATH'te yoksa build/ altina indirir; runtime 503'lerine karsi onbellege alinir.
+fetch_appimagetool() {
+  local dest="$ROOT/build/appimagetool"
+  local url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+
+  if command -v appimagetool >/dev/null 2>&1; then
+    APPIMAGETOOL="$(command -v appimagetool)"
+    return 0
+  fi
+  if [ -s "$dest" ]; then
+    APPIMAGETOOL="$dest"
+    chmod +x "$APPIMAGETOOL"
+    return 0
+  fi
+
+  rm -f "$dest"
+  echo "==> appimagetool indiriliyor..."
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 "$url" -o "$dest" || rm -f "$dest"
+  fi
+  if [ ! -s "$dest" ] && command -v wget >/dev/null 2>&1; then
+    wget -O "$dest" "$url" || rm -f "$dest"
+  fi
+  if [ ! -s "$dest" ]; then
+    echo "HATA: appimagetool indirilemedi. Internet baglantisini kontrol et"
+    echo "      ya da appimagetool'u PATH'e kurup tekrar dene."
+    exit 1
+  fi
+  chmod +x "$dest"
+  APPIMAGETOOL="$dest"
+}
+
+fetch_appimage_runtime() {
+  local dest="$ROOT/build/runtime-x86_64"
+  local url="https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"
+  APPIMAGE_RUNTIME=""
+
+  if [ -s "$dest" ]; then
+    APPIMAGE_RUNTIME="$dest"
+    return 0
+  fi
+
+  echo "==> AppImage runtime indiriliyor..."
+  rm -f "$dest"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 "$url" -o "$dest" || rm -f "$dest"
+  fi
+  if [ ! -s "$dest" ] && command -v wget >/dev/null 2>&1; then
+    wget -O "$dest" "$url" || rm -f "$dest"
+  fi
+  if [ ! -s "$dest" ]; then
+    echo "UYARI: AppImage runtime indirilemedi; appimagetool kendi deneyecek."
+    rm -f "$dest"
+    return 1
+  fi
+  chmod +x "$dest"
+  APPIMAGE_RUNTIME="$dest"
+}
+
+ensure_pyinstaller() {
+  local PY
+  PY="$(python_bin)"
+  if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
+    echo "==> pyinstaller kuruluyor ($PY)..."
+    "$PY" -m pip install --quiet pyinstaller
+  fi
+  PYINSTALLER_PY="$PY"
+}
+
+pyi_build() {
+  mkdir -p "$ROOT/build"
+  ensure_pyinstaller
+  echo "==> PyInstaller onedir derlemesi (netspectre v$VERSION)..."
+  rm -rf "$ROOT/build/pyi"
+  # -m netsentinel: `python -m netsentinel` giris noktasi; veri dosyalari
+  # sys._MEIPASS/data olarak paketlenir (bkz. netsentinel/data_paths.py).
+  ( cd "$ROOT/build" && "$PYINSTALLER_PY" -m PyInstaller \
+      --noconfirm --clean --onedir --name netspectre \
+      --distpath "$ROOT/build/pyi" --workpath "$ROOT/build/work" --specpath "$ROOT/build" \
+      --paths "$ROOT/src" \
+      --add-data "$ROOT/src/netsentinel/data:data" \
+      --collect-all scapy \
+      --copy-metadata netsentinel \
+      "$ROOT/packaging/entrypoint.py" >/dev/null )
+  [ -x "$ROOT/build/pyi/netspectre/netspectre" ] || { echo "HATA: derleme basarisiz"; exit 1; }
+  "$ROOT/build/pyi/netspectre/netspectre" --version || { echo "HATA: derlenen calistirilamadi"; exit 1; }
+  echo "==> build/pyi/netspectre/netspectre"
+}
+
+build_linux() {
+  local fmt="$1"
+  pyi_build
+
+  case "$fmt" in
+    appimage)
+      echo "==> AppImage paketleniyor..."
+      APPDIR="$ROOT/build/NetSpectre.AppDir"
+      rm -rf "$APPDIR"
+      mkdir -p "$APPDIR/usr/share/netspectre" "$APPDIR/usr/share/applications" \
+               "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+
+      # PyInstaller onedir agaci oldugu gibi tasinir (binary yaninda _internal).
+      cp -a "$ROOT/build/pyi/netspectre/." "$APPDIR/usr/share/netspectre/"
+      cp "$ROOT/packaging/netspectre.png" "$APPDIR/netspectre.png"
+      ln -sf netspectre.png "$APPDIR/.DirIcon"
+      cp "$ROOT/packaging/netspectre.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/netspectre.png"
+
+      cat > "$APPDIR/AppRun" << 'APPRUN'
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+BIN="$HERE/usr/share/netspectre/netspectre"
+# Argüman varsa veya gerçek terminal varsa doğrudan çalıştır; masaüstünden
+# tıklanınca (tty yok) bir terminal aç — NetSentinel bir TUI/CLI aracıdır.
+if [ $# -gt 0 ] || [ -t 0 ]; then
+  exec "$BIN" "$@"
+else
+  for term in x-terminal-emulator gnome-terminal konsole xfce4-terminal alacritty kitty xterm; do
+    if command -v "$term" >/dev/null 2>&1; then
+      exec "$term" -e "$BIN"
+    fi
+  done
+  exec "$BIN" "$@"
+fi
+APPRUN
+      chmod +x "$APPDIR/AppRun"
+
+      cat > "$APPDIR/netspectre.desktop" << 'DESKTOP'
+[Desktop Entry]
+Name=NetSentinel
+Comment=Gizli kamera ve bilinmeyen IoT cihaz tespiti
+Exec=netspectre
+Icon=netspectre
+Terminal=true
+Type=Application
+Categories=System;Security;
+StartupNotify=false
+DESKTOP
+      cp "$APPDIR/netspectre.desktop" "$APPDIR/usr/share/applications/"
+
+      fetch_appimagetool
+      cd "$ROOT/build"
+      "$APPIMAGETOOL" --appimage-extract > /dev/null 2>&1 || true
+      TMP_APPIMAGE="NetSpectre.build.AppImage"
+      rm -f "$TMP_APPIMAGE"
+      fetch_appimage_runtime || true
+      if [ -n "${APPIMAGE_RUNTIME:-}" ]; then
+        ./squashfs-root/AppRun --runtime-file "$APPIMAGE_RUNTIME" -n NetSpectre.AppDir "$TMP_APPIMAGE"
+      else
+        ./squashfs-root/AppRun -n NetSpectre.AppDir "$TMP_APPIMAGE"
+      fi
+      mv -f "$TMP_APPIMAGE" NetSpectre.AppImage
+      rm -rf squashfs-root "$APPDIR"
+      cd "$ROOT"
+      echo "==> build/NetSpectre.AppImage"
+      ;;
+    targz)
+      echo "==> tar.gz paketleniyor..."
+      mkdir -p "$ROOT/build/netspectre_Linux_x86_64"
+      rm -rf "$ROOT/build/netspectre_Linux_x86_64/netspectre"
+      cp -a "$ROOT/build/pyi/netspectre" "$ROOT/build/netspectre_Linux_x86_64/netspectre"
+      cp "$ROOT/README.md" "$ROOT/build/netspectre_Linux_x86_64/" 2>/dev/null || true
+      cp "$ROOT/config.example.yaml" "$ROOT/build/netspectre_Linux_x86_64/" 2>/dev/null || true
+      cd "$ROOT/build" && tar czf netspectre_Linux_x86_64.tar.gz netspectre_Linux_x86_64 && cd "$ROOT"
+      rm -rf "$ROOT/build/netspectre_Linux_x86_64"
+      echo "==> build/netspectre_Linux_x86_64.tar.gz"
+      ;;
+    binary)
+      echo "==> build/pyi/netspectre/ (onedir)"
+      ;;
+    *)
+      echo "Bilinmeyen linux formati: $fmt (gecerli: appimage | targz | binary)"
+      exit 1
+      ;;
+  esac
+}
+
+build_target() {
+  local os="$1" fmt="$2"
+  banner
+  echo "Hedef: OS=$os  Format=$fmt  Version=$VERSION"
+  echo
+  case "$os" in
+    linux) build_linux "$fmt" ;;
+    windows|macos|darwin)
+      echo "$os icin paketleme desteklenmiyor (bkz. --list). Python capraz derleme guvenilir degil."
+      exit 1
+      ;;
+    *)
+      echo "Bilinmeyen OS: $os (gecerli: linux)"
+      exit 1
+      ;;
+  esac
+  echo
+  echo "Bitti."
+}
+
+interactive() {
+  banner
+  echo
+  echo "Paket formati sec (Linux — AppImage tüm dagitimlarda calisir):"
+  select f in "AppImage (.AppImage)" "tar.gz (.tar.gz)" "Binary (onedir dizini)" "Vazgec"; do
+    case "$REPLY" in
+      1) FMT="appimage"; break ;;
+      2) FMT="targz"; break ;;
+      3) FMT="binary"; break ;;
+      4|"") echo "Vazgecildi."; exit 0 ;;
+      *) echo "Gecersiz secim, tekrar dene." ;;
+    esac
+  done
+  build_target linux "$FMT"
+}
+
+# ---- argüman yönlendirme ----
+if [ $# -eq 0 ]; then
+  interactive
+  exit 0
+fi
+
+case "${1:-}" in
+  -h|--help|help)
+    usage
+    ;;
+  -l|--list|list)
+    list_targets
+    ;;
+  --install|install)
+    do_install
+    ;;
+  --version|-v)
+    echo "netspectre $VERSION"
+    ;;
+  linux)
+    if [ $# -lt 2 ]; then
+      echo "Format eksik. Ornek: ./netspectre linux <appimage|targz|binary>"
+      list_targets
+      exit 1
+    fi
+    if [ $# -ge 3 ]; then
+      VERSION="$3"
+    fi
+    build_target linux "$2"
+    ;;
+  windows|macos|darwin)
+    if [ $# -ge 2 ] && [ -n "${2:-}" ]; then
+      build_target "$1" "$2"
+    else
+      echo "$1 icin paketleme desteklenmiyor (bkz. --list)"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Bilinmeyen komut: $1"
+    echo
+    usage
+    exit 1
+    ;;
+esac

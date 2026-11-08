@@ -41,15 +41,19 @@ dev = [
     "pip-audit>=2.7",
     "types-PyYAML",
 ]
+packaging = [
+    "pyinstaller>=6.6",
+]
 
 [project.scripts]
 netsentinel = "netsentinel.__main__:main"
+netspectre = "netsentinel.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-netsentinel = ["../data/*.json", "../data/*.yaml"]
+netsentinel = ["data/*.json", "data/*.yaml"]
 
 [tool.ruff]
 line-length = 100

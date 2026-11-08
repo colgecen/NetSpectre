@@ -29,11 +29,12 @@ Etkileşimli terminal arayüzü (`--tui`) — canlı tarama, sıralanabilir tabl
 
 - **Cihaz keşfi**: Scapy ile ARP taraması + zeroconf ile mDNS servis duyuruları + SSDP
   (`M-SEARCH` ve pasif `NOTIFY`) — ağdaki cihazları isim, üretici ve servisleriyle bulur
-- **Kamera ve IoT imzaları**: `data/camera_signatures.yaml` port/banner/servis kalıplarıyla
+- **Kamera ve IoT imzaları**: `src/netsentinel/data/camera_signatures.yaml` port/banner/servis
+  kalıplarıyla
   kamera, NVR ve mikraf sınıfı cihazları tanır; `--passive` modda ağa hiçbir paket
   göndermeden yalnızca mDNS/SSDP dinler
 - **Üretici/tür önerisi**: imza eşleşmezse 40 bin kayıtlık yerel IEEE OUI veritabanından
-  (`data/oui.json`) üretici ve cihaz türü önerir
+  (`src/netsentinel/data/oui.json`) üretici ve cihaz türü önerir
 - **Risk puanı**: her cihaz 0-100 puan ve `düşük/orta/yüksek/kritik` seviyesi alır;
   gerekçeler (açık RTSP portu, kamera banner'ı, kimliksiz cihaz, rastgele MAC…) tek tek
   yazılır
@@ -59,6 +60,9 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install .
 netsentinel --no-connect            # bağlı olduğun ağda hızlı tarama
 ```
+
+`config.yaml` zorunlu değildir; araç yerleşik güvenli varsayılanlarla çalışır. Ağ seçimi
+veya beyaz liste için şablondan kopyala: `cp config.example.yaml config.yaml`.
 
 Etkin mod (ARP taraması) ham paket göndermek ister. Python'a yetenek ver veya sudo ile
 çalıştır:
@@ -137,9 +141,26 @@ GitHub Actions CI hattı bunları Python 3.10-3.13 matrisinde çalıştırır; a
 
 Yardımcı betikler:
 
-- `scripts/update_oui.py` — IEEE OUI veritabanını `data/oui.json`a indirir/günceller
+- `scripts/update_oui.py` — IEEE OUI veritabanını `src/netsentinel/data/oui.json`a indirir
 - `scripts/distro_test.sh` — container içinde tam kurulum + test koşar
 - `scripts/make_screenshots.py` — README ekran görüntülerini (SVG) üretir
+
+### Paket olarak dağıt: AppImage
+
+Har makineye tek dosya taşımak istersen repo kökündeki `netspectre` betiği PyInstaller
+ile kendi- kendine yeten Linux paketi üretir (imza/OUI verileri pakete gömülüdür):
+
+```bash
+./netspectre linux appimage     # build/NetSpectre.AppImage (~41 MB, tüm dağıtımlar)
+./netspectre linux targz        # build/netspectre_Linux_x86_64.tar.gz
+./netspectre --install          # her klasörden 'netspectre' yazmak için ~/.local/bin'e bağ kur
+```
+
+`./netspectre` yazınca interaktif menü açılır. AppImage'ı çalıştırmadan önce
+`chmod +x NetSpectre.AppImage` yeterlidir. Etkin mod (ARP) ham paket yetkisi
+istediğinden AppImage içinde `sudo ./NetSpectre.AppImage …` ile çalıştırılır;
+`--passive` ve TUI yetkisiz çalışır. Windows/macOS paketleme güvenilir çapraz derleme
+olanağı olmadığı için desteklenmez.
 
 ### Uyumluluk
 

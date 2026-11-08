@@ -10,11 +10,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from netsentinel.data_paths import data_dizini
 from netsentinel.models import normalize_mac
 
-# Paket köküne göre varsayılan veri yolu: src/netsentinel/analyzer/oui.py → repo/data
-PAKET_KOKU = Path(__file__).resolve().parents[3]
-VARSAYILAN_OUI_YOLU = PAKET_KOKU / "data" / "oui.json"
+# Varsayılan veri yolu paketle birlikte gelir (wheel/AppImage dahil; bkz. data_paths)
+VARSAYILAN_OUI_YOLU = data_dizini() / "oui.json"
 
 
 class OuiVeritabani:
