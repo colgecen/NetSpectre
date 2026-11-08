@@ -22,13 +22,13 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 
 ## Sprint 3 — Kimliklendirme ve Analiz (Hafta 3)
 **Hedef:** Her cihaz için tür tahmini ve risk puanı.
-- [ ] Yerel OUI veritabanı (`data/oui.json`) + güncelleme betiği
-- [ ] `analyzer/ports.py`: hız sınırlı nmap taraması (yalnızca hedef portlar)
-- [ ] HTTP/RTSP banner toplama (kısa zaman aşımı)
-- [ ] `camera_signatures.yaml` ve kural motoru
-- [ ] `scoring.py` + `risk_reasons` üretimi
-- [ ] Beyaz liste mantığı
-- [ ] Birim testler: bilinen kamera/IoT/telefon örnekleriyle
+- [x] Yerel OUI veritabanı (`data/oui.json`) + güncelleme betiği
+- [x] `analyzer/ports.py`: hız sınırlı nmap taraması (yalnızca hedef portlar)
+- [x] HTTP/RTSP banner toplama (kısa zaman aşımı)
+- [x] `camera_signatures.yaml` ve kural motoru
+- [x] `scoring.py` + `risk_reasons` üretimi
+- [x] Beyaz liste mantığı
+- [x] Birim testler: bilinen kamera/IoT/telefon örnekleriyle
 
 ## Sprint 4 — TUI (Hafta 4)
 **Hedef:** Canlı güncellenen, renk kodlu panel.

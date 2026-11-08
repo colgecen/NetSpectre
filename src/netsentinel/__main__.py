@@ -12,9 +12,10 @@ import sys
 from collections.abc import Callable
 
 from netsentinel import __version__
+from netsentinel.analyzer import cihazlari_analiz_et
 from netsentinel.config import AppConfig, ConfigError, check_file_permissions, load_config
 from netsentinel.discovery.scan import kesfet
-from netsentinel.models import Device, NetworkInfo, ScanResult
+from netsentinel.models import NetworkInfo, ScanResult
 from netsentinel.permissions import (
     PermissionStatus,
     check_permissions,
@@ -65,28 +66,43 @@ def _yazdir(info: NetworkInfo) -> None:
     print(f"  Alt ağ  : {info.cidr or '—'}")
 
 
-def _cihaz_tablosu(cihazlar: list[Device]) -> None:
+_SEVIYE_STIL = {"yesil": "green", "dikkat": "yellow", "supheli": "bold red"}
+
+
+def _cihaz_tablosu(sonuc: ScanResult) -> None:
     from rich.console import Console
     from rich.table import Table
+    from rich.text import Text
 
+    cihazlar = sonuc.sorted_by_risk()
     tablo = Table(title=f"Keşfedilen cihazlar ({len(cihazlar)})")
     tablo.add_column("IP", style="cyan", no_wrap=True)
     tablo.add_column("MAC", style="magenta")
     tablo.add_column("Hostname")
-    tablo.add_column("Servisler / SSDP", overflow="fold")
-    for c in sorted(cihazlar, key=lambda d: _ip_sirasi(d.ip)):
+    tablo.add_column("Üretici")
+    tablo.add_column("Tür")
+    tablo.add_column("Puan", justify="right")
+    for c in cihazlar:
         servis = ", ".join(c.mdns_services) or (c.ssdp_info or "—")
-        tablo.add_row(c.ip or "—", c.mac or "?", c.hostname or "—", servis)
+        hostname = c.hostname or (servis if servis != "—" else "—")
+        tablo.add_row(
+            c.ip or "—",
+            c.mac or "?",
+            hostname,
+            c.vendor or "—",
+            c.device_type,
+            Text(str(c.risk_score), style=_SEVIYE_STIL[c.risk_level.value]),
+        )
     Console().print(tablo)
 
-
-def _ip_sirasi(ip: str) -> tuple[int, ...]:
-    import ipaddress
-
-    try:
-        return tuple(ipaddress.ip_address(ip).packed)
-    except ValueError:
-        return (255,)
+    supheli = sonuc.suspicious
+    if supheli:
+        console = Console()
+        console.print("\n[bold red]⚠️  Şüpheli cihazlar:[/]")
+        for c in supheli:
+            console.print(f"  • [red]{c.ip} ({c.mac})[/red] — {c.risk_score} puan")
+            for gerekce in c.risk_reasons:
+                console.print(f"      [dim]- {gerekce}[/dim]")
 
 
 def run(
@@ -135,9 +151,14 @@ def run(
     _yazdir(info)
     print(f"\n🔎 Keşif sürüyor (mod={cfg.scan.mode}, yürütme={durum.mode_label}) …")
     sonuc, _rapor = kesif_fn(info, cfg.scan)
-    _cihaz_tablosu(sonuc.devices)
+    print("🧠 Cihazlar analiz ediliyor (OUI + imzalar + puanlama) …")
+    cihazlari_analiz_et(sonuc, whitelist=cfg.whitelisted_macs, gateway_ip=info.gateway)
+    _cihaz_tablosu(sonuc)
     ozet = sonuc.summary()
-    print(f"\n✅ {ozet['total']} cihaz keşfedildi. Analiz/risk puanı Sprint 3'te eklenecek.")
+    print(
+        f"\n✅ {ozet['total']} cihaz: {ozet['suspicious']} şüpheli, "
+        f"{ozet['attention']} dikkat, {ozet['trusted']} güvenilir."
+    )
     return 0
 
 
