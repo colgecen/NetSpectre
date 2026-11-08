@@ -165,3 +165,26 @@ class TestRun:
             kesif_fn=bos_kesif,
         )
         assert gorulen["rate"] == 7  # config'deki 40 yerine bayrak değeri
+
+    def test_tui_bayragi_uygulamayi_kurur_ve_calistirir(self, cfg_dosyasi, capsys):
+        from netsentinel.ui.app import NetSentinelApp
+
+        mgr = SahteMgr()
+        gorulen: dict = {}
+
+        def sahte_tui(app):
+            gorulen["app"] = app
+            return 0
+
+        kod = run(
+            ["--config", cfg_dosyasi, "--tui", "--no-connect"],
+            wifi_manager=mgr,
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+            tui_fn=sahte_tui,
+        )
+        assert kod == 0
+        assert "TUI açılıyor" in capsys.readouterr().out
+        app = gorulen["app"]
+        assert isinstance(app, NetSentinelApp)
+        assert app._aktif_ssid == "EvAg_5G"

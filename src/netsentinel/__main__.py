@@ -42,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--iface", help="Wi-Fi arayüzü (örn. wlan0); boşsa otomatik")
     p.add_argument(
+        "--tui",
+        action="store_true",
+        help="renk kodlu canlı Textual arayüzünü aç",
+    )
+    p.add_argument(
         "--export",
         choices=["json", "md"],
         help="sonucu dosyaya yaz (Sprint 5'te etkinleşecek)",
@@ -105,11 +110,29 @@ def _cihaz_tablosu(sonuc: ScanResult) -> None:
                 console.print(f"      [dim]- {gerekce}[/dim]")
 
 
+def _tui_hazirla(
+    cfg: AppConfig,
+    durum: PermissionStatus,
+    info: NetworkInfo,
+    kesif_fn: Callable[..., tuple[ScanResult, object]],
+) -> object:
+    """TUI uygulamasını enjekte edilmiş tarama fonksiyonuyla kurar."""
+    from netsentinel.ui.app import NetSentinelApp
+
+    def tarama_fn() -> ScanResult:
+        sonuc, _ = kesif_fn(info, cfg.scan)
+        return cihazlari_analiz_et(sonuc, whitelist=cfg.whitelisted_macs, gateway_ip=info.gateway)
+
+    print(f"🖥  TUI açılıyor (mod={cfg.scan.mode}, yürütme={durum.mode_label}) — q ile çıkılır")
+    return NetSentinelApp(tarama_fn, ssid=info.ssid)
+
+
 def run(
     argv: list[str] | None = None,
     wifi_manager: WifiManager | None = None,
     permission_status: PermissionStatus | None = None,
     kesif_fn: Callable[..., tuple[ScanResult, object]] = kesfet,
+    tui_fn: Callable[[object], int] | None = None,
 ) -> int:
     """Uygulama akışı; bağımlılıklar testte enjekte edilebilir."""
     args = build_parser().parse_args(argv)
@@ -147,6 +170,11 @@ def run(
     except WifiError as exc:
         print(f"❌ {exc}", file=sys.stderr)
         return 1
+
+    if args.tui:
+        app = _tui_hazirla(cfg, durum, info, kesif_fn)
+        calistir = tui_fn if tui_fn is not None else (lambda a: int(a.run() or 0))
+        return calistir(app)
 
     _yazdir(info)
     print(f"\n🔎 Keşif sürüyor (mod={cfg.scan.mode}, yürütme={durum.mode_label}) …")
