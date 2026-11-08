@@ -156,6 +156,7 @@ class ScanResult:
     devices: list[Device] = field(default_factory=list)
     started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
+    yeni_cihazlar: list[str] = field(default_factory=list)  # önceki taramada olmayan MAC'ler
 
     def add_device(self, device: Device) -> None:
         """MAC üzerinden tekilleştirerek cihaz ekler; varsa zaman damgasını günceller."""
@@ -185,12 +186,25 @@ class ScanResult:
         """Risk puanı azalan, eşitlikte IP sıralı cihaz listesi."""
         return sorted(self.devices, key=lambda d: (-d.risk_score, _ip_sort_key(d.ip)))
 
+    @property
+    def yeni_cihaz_cihazları(self) -> list[Device]:
+        """``yeni_cihazlar`` MAC listesine karşılık gelen cihazlar (risk sıralı)."""
+        küme = set(self.yeni_cihazlar)
+        return [d for d in self.sorted_by_risk() if d.mac in küme]
+
+    def önceki_ile_karşılaştır(self, önceki_maclar: set[str]) -> list[Device]:
+        """Önceki taramada olmayan cihazları işaretler; ``self.yeni_cihazlar``ı doldurur."""
+        once = set(önceki_maclar)
+        self.yeni_cihazlar = [d.mac for d in self.sorted_by_risk() if d.mac not in once]
+        return self.yeni_cihaz_cihazları
+
     def summary(self) -> dict[str, int]:
         return {
             "total": len(self.devices),
             "suspicious": len(self.suspicious),
             "attention": len(self.unknown),
             "trusted": sum(1 for d in self.devices if d.trusted),
+            "yeni": len(self.yeni_cihazlar),
         }
 
 

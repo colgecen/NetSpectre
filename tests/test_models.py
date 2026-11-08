@@ -162,4 +162,16 @@ class TestScanResult:
             "suspicious": 1,
             "attention": 1,
             "trusted": 1,
+            "yeni": 0,
         }
+
+    def test_onceki_ile_karsilastir_yeni_isaretler(self):
+        result = ScanResult()
+        result.add_device(make_device(ip="192.168.1.50", mac="0C:75:D2:00:00:01", risk_score=90))
+        result.add_device(make_device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", risk_score=0))
+        yeni = result.önceki_ile_karşılaştır({"11:AA:22:BB:33:CC"})
+        assert [d.mac for d in yeni] == ["0C:75:D2:00:00:01"]
+        assert result.yeni_cihazlar == ["0C:75:D2:00:00:01"]
+        assert result.summary()["yeni"] == 1
+        # ikinci kez aynı kümeyle → yeni yok
+        assert result.önceki_ile_karşılaştır({"11:AA:22:BB:33:CC", "0C:75:D2:00:00:01"}) == []
