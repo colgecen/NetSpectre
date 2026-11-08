@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.venv*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Kullanıcı yapılandırması — gizli bilgi içerebilir, repoya girmez (bkz. security.md)
+config.yaml
+
+# Rapor çıktıları (MAC/IP içerir, kişisel veri sayılabilir)
+reports/
+
+# İşletim sistemi / editör
+.DS_Store
+.idea/
+.vscode/

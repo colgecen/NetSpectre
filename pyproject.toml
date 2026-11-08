@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netsentinel"
+version = "0.1.0"
+description = "Kendi Wi-Fi ağlarınızdaki gizli kamera, mikrofon ve bilinmeyen IoT cihazlarını tespit eden terminal tabanlı güvenlik aracı."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "NetSentinel Contributors" }]
+keywords = ["security", "wifi", "camera-detection", "iot", "network-scanning"]
+classifiers = [
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "scapy>=2.5.0",
+    "python-nmap>=0.7.1",
+    "zeroconf>=0.130.0",
+    "textual>=0.60.0",
+    "rich>=13.7.0",
+    "pyyaml>=6.0.1",
+    "pydantic>=2.5.0",
+    "keyring>=24.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.9",
+    "pip-audit>=2.7",
+    "types-PyYAML",
+]
+
+[project.scripts]
+netsentinel = "netsentinel.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+netsentinel = ["../data/*.json", "../data/*.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "src"
+packages = ["netsentinel"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
