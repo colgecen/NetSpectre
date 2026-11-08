@@ -40,8 +40,8 @@ Tahmini süreler tek geliştirici, haftada ~10 saat için verilmiştir. Her spri
 
 ## Sprint 5 — Rapor, Test ve Sertleştirme (Hafta 5)
 **Hedef:** Paylaşılabilir ilk sürüm (v0.1).
-- [ ] `report.py`: JSON + Markdown çıktı
-- [ ] Taramalar arası fark: "yeni cihaz" uyarısı
+- [x] `report.py`: JSON + Markdown çıktı
+- [x] Taramalar arası fark: "yeni cihaz" uyarısı
 - [ ] Ubuntu, Debian, Arch, Kali'de test
 - [ ] `pip-audit`, `ruff`, `mypy` CI (GitHub Actions)
 - [ ] README ekran görüntüleri, kurulum doğrulama
