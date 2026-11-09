@@ -99,7 +99,9 @@ LOG="\${NETSPECTRE_LOG:-\$HOME/.local/state/netspectre.log}"
 mkdir -p "\$(dirname "\$LOG")" 2>/dev/null
 [ -n "\$TERM" ] || export TERM=xterm-256color
 if [ \$# -eq 0 ]; then
-  set -- --tui --no-connect
+  # Argsiz kullanimda hedeflenen akis "tüm kayitli aglari dolaş"tir.
+  # Tek ag görmek isteyen "net-spectre --tui --no-connect" kullanir.
+  set -- --tui --hepsi
 else
   # 'tüm ağlar' isteniyorsa (nerede olursa olsun) arayüzde aç
   TUM=0

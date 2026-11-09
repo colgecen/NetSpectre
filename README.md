@@ -168,8 +168,9 @@ Kurulduktan sonra herhangi bir dizinden:
 
 ```bash
 netspectre                    # paketleme menüsü
-net-spectre                    # TUI; içinde 't' = tüm kayıtlı ağları dolaş
-net-spectre --hepsi            # açılışta tüm ağlar modu; yetki yoksa sudo önerir
+net-spectre                    # TUI; açılışta tüm kayıtlı ağları sırayla dolaşır
+net-spectre --tui --no-connect  # yalnızca mevcut bağlı olduğun ağı gösterir
+net-spectre --hepsi            # açılışta tüm ağlar modu (net-spectre ile aynı)
 net-spectre --passive --no-connect  # yetki istemez, yalnızca dinleme
 ```
 
