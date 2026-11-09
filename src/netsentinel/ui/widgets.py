@@ -35,6 +35,7 @@ KOLONLAR: tuple[tuple[str, str], ...] = (
     ("Hostname", "hostname"),
     ("Üretici", "vendor"),
     ("Son neden", "gerekce"),
+    ("Ağ", "ssid"),
 )
 
 
@@ -119,6 +120,7 @@ class CihazTablosu(DataTable):
                 cihaz.hostname or "—",
                 cihaz.vendor or "—",
                 cihaz.risk_reasons[0] if cihaz.risk_reasons else "—",
+                cihaz.ssid or "—",
             )
             self.satir_cihaz[anahtar] = cihaz
         if puan_kolonu is not None:
@@ -146,6 +148,8 @@ class DetayPanel(Static):
             f"Üretici: {cihaz.vendor or 'bilinmiyor'}   "
             f"Rastgele MAC: {'evet' if cihaz.mac_is_random else 'hayır'}",
         ]
+        if cihaz.ssid:
+            parcalar.append(f"Ağ: {cihaz.ssid}")
         if cihaz.mdns_services:
             parcalar.append("mDNS: " + ", ".join(cihaz.mdns_services))
         if cihaz.ssdp_info:

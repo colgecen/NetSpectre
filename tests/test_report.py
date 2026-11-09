@@ -117,3 +117,70 @@ def test_bozuk_kayit_bos_kume_dondu(tmp_path):
     yol.write_text("{bozuk", encoding="utf-8")
     assert report.kayıtlı_anahtarlar(yol) == (set(), False)
     assert report.son_rapor(tmp_path / "yok") is None
+
+
+class TestCokluRapor:
+    """CokluSonuc (tüm ağlar) raporları: JSON/MD + dosya yazma."""
+
+    @staticmethod
+    def _coklu():
+        from netsentinel.multiscan import AgSonucu, CokluSonuc
+
+        sonuc1 = ScanResult(
+            network=NetworkInfo(
+                ssid="EvAg", iface="wlan0", bssid="AA:BB:CC:00:11:22", gateway="192.168.1.1"
+            )
+        )
+        sonuc1.add_device(
+            Device(
+                ip="192.168.1.5",
+                mac="0C:75:D2:AA:BB:CC",
+                device_type="camera",
+                risk_score=80,
+                risk_reasons=["kamera"],
+            )
+        )
+        sonuc2 = ScanResult(
+            network=NetworkInfo(ssid="Misafir", iface="wlan0", gateway="192.168.2.1")
+        )
+        sonuc2.add_device(
+            Device(ip="192.168.2.9", mac="9A:1B:2C:3D:4E:5F", device_type="unknown", risk_score=25)
+        )
+        coklu = CokluSonuc(
+            aglar=[
+                AgSonucu(network=sonuc1.network, sonuc=sonuc1),
+                AgSonucu(network=sonuc2.network, sonuc=sonuc2),
+            ],
+            atlanan=[("Komsu", "kayıtlı NetworkManager profili yok")],
+            kaynak_ssid="EvAg",
+        )
+        return coklu
+
+    def test_coklu_json_her_agi_ayri_bolumde_yazar(self):
+        cikti = json.loads(report.coklu_json_metni(self._coklu()))
+        assert cikti["tum_aglar"] is True
+        assert cikti["kaynak_ssid"] == "EvAg"
+        assert len(cikti["taramalar"]) == 2
+        assert cikti["taramalar"][0]["ssid"] == "EvAg"
+        assert cikti["taramalar"][0]["özet"]["total"] == 1
+        assert cikti["taramalar"][0]["cihazlar"][0]["device_type"] == "camera"
+        assert cikti["atlanan"][0]["ssid"] == "Komsu"
+        assert cikti["olsun"]["cihaz"] == 2
+
+    def test_coklu_markdown_ag_bolumleri_ve_atlananlar(self):
+        metin = report.coklu_markdown_metni(self._coklu())
+        assert "## Ağ: EvAg" in metin
+        assert "## Ağ: Misafir" in metin
+        assert "## Atlanan ağlar" in metin
+        assert "Komsu" in metin
+
+    def test_yaz_coklu_sonucu_dosyaya_yazar(self, tmp_path):
+        yol = report.yaz(self._coklu(), "json", dizin=tmp_path)
+        assert yol.exists()
+        veri = json.loads(yol.read_text(encoding="utf-8"))
+        assert veri["tum_aglar"] is True
+
+    def test_yaz_coklu_markdown_dosya(self, tmp_path):
+        yol = report.yaz(self._coklu(), "md", dizin=tmp_path)
+        assert yol.suffix == ".md"
+        assert "## Ağ: EvAg" in yol.read_text(encoding="utf-8")

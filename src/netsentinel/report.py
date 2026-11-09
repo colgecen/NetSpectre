@@ -11,9 +11,12 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from netsentinel.models import Device, RiskLevel, ScanResult, utcnow
+
+if TYPE_CHECKING:
+    from netsentinel.multiscan import CokluSonuc
 
 _TUZ = b"netsentinel-v1"
 
@@ -173,22 +176,75 @@ def _zaman_damgası(an: datetime) -> str:
 
 
 def yaz(
-    result: ScanResult,
+    result: ScanResult | CokluSonuc,
     biçim: str,
     *,
     dizin: str | Path = "./reports",
     anonymize: bool = False,
     ad: str | None = None,
 ) -> Path:
-    """Raporu ``dizin`` içine zamanlı dosya olarak yazar; yolu döndürür."""
+    """Raporu ``dizin`` içine zamanlı dosya olarak yazar; yolu döndürür.
+
+    ``result`` tek ağın ``ScanResult``ı veya çok ağlı ``CokluSonuc`` olabilir.
+    """
+    from netsentinel.multiscan import CokluSonuc
+
     kök = Path(dizin)
     kök.mkdir(parents=True, exist_ok=True)
     uzantı = {"json": "json", "md": "md", "markdown": "md"}[biçim]
-    taban = ad or f"netsentinel-{_zaman_damgası(result.started_at)}"
+    if isinstance(result, CokluSonuc):
+        kaynak = result.bilesik
+        metin = (
+            coklu_json_metni(result, anonymize)
+            if uzantı == "json"
+            else coklu_markdown_metni(result, anonymize)
+        )
+    else:
+        kaynak = result
+        metin = (
+            json_metni(result, anonymize) if uzantı == "json" else markdown_metni(result, anonymize)
+        )
+    taban = ad or f"netsentinel-{_zaman_damgası(kaynak.started_at)}"
     yol = kök / f"{taban}.{uzantı}"
-    metin = json_metni(result, anonymize) if uzantı == "json" else markdown_metni(result, anonymize)
     yol.write_text(metin, encoding="utf-8")
     return yol
+
+
+def coklu_json_metni(coklu: CokluSonuc, anonymize: bool = False) -> str:
+    """Tüm ağların raporunu tek JSON olarak (ağ bölümleri + atlanan listesi)."""
+    veri: dict[str, Any] = {
+        "olusturuldu": coklu.bilesik.started_at.isoformat(),
+        "olsun": coklu.ozet(),
+        "tum_aglar": True,
+        "kaynak_ssid": coklu.kaynak_ssid,
+        "atlanan": [{"ssid": ssid, "neden": neden} for ssid, neden in coklu.atlanan],
+        "taramalar": [rapor_sözlüğü(ag.sonuc, anonymize) for ag in coklu.aglar],
+    }
+    return json.dumps(veri, ensure_ascii=False, indent=2)
+
+
+def coklu_markdown_metni(coklu: CokluSonuc, anonymize: bool = False) -> str:
+    """Ağ ağ markdown raporu; en alta atlanan ağların gerekçeleri eklenir."""
+    parcalar = [
+        "# NetSentinel — tüm ağlar tarama raporu",
+        "",
+        f"- Ağ sayısı: **{len(coklu.aglar)}**",
+        f"- Cihaz sayısı: **{len(coklu.cihazlar)}**",
+        f"- Başlangıç ağı: `{coklu.kaynak_ssid or '—'}`",
+    ]
+    parcalar.append("")
+    for ag in coklu.aglar:
+        parcalar.append(f"## Ağ: {ag.network.ssid}")
+        parcalar.append("")
+        parcalar.append(
+            markdown_metni(ag.sonuc, anonymize).replace("# NetSentinel", "## NetSentinel", 1)
+        )
+        parcalar.append("")
+    if coklu.atlanan:
+        parcalar.append("## Atlanan ağlar")
+        parcalar.append("")
+        parcalar.extend(f"- `{ssid}`: {neden}" for ssid, neden in coklu.atlanan)
+    return "\n".join(parcalar)
 
 
 def yeni_cihazları_işaretle(

@@ -44,8 +44,9 @@ usage() {
   echo "Kullanim:"
   echo "  ./netspectre                 Interaktif menü"
   echo "  ./netspectre linux <format>  Direkt derle"
-  echo "  ./netspectre --install       Iki komut kur: 'netspectre' (menu) + 'net-spectre' (uygulama)"
-  echo "  ./netspectre --list          Hedefleri listele"
+  echo "  ./netspectre --yetki        Derlenen ikiliye ARP yetkisi ver (sudo şifre sorar)"
+  echo "  ./netspectre --install      'netspectre' (menu) + 'net-spectre' (uygulama) kur"
+  echo "  ./netspectre --list         Hedefleri listele"
   echo "  ./netspectre --help          Bu yardim"
   echo
   echo "Hedefler (yalniz Linux):"
@@ -91,11 +92,48 @@ do_install() {
     cat > "$bindir/net-spectre" << WRAP
 #!/usr/bin/env bash
 # NetSentinel uygulamasi — argsiz: terminal arayuzu (TUI).
+# Hata olursa yutulmasin: stderr log'a yazilir; yetki hatasiysa sudo ile
+# tekrar calistirmayi onerir (sifre istemi terminalde gorunur).
 BIN="$hedef"
+LOG="\${NETSPECTRE_LOG:-\$HOME/.local/state/netspectre.log}"
+mkdir -p "\$(dirname "\$LOG")" 2>/dev/null
+[ -n "\$TERM" ] || export TERM=xterm-256color
 if [ \$# -eq 0 ]; then
-  exec "\$BIN" --tui --no-connect
+  set -- --tui --no-connect
+else
+  # 'tüm ağlar' isteniyorsa (nerede olursa olsun) arayüzde aç
+  TUM=0
+  for a in "\$@"; do
+    case "\$a" in
+      --hepsi|--all-networks) TUM=1 ;;
+    esac
+  done
+  [ "\$TUM" = "1" ] && set -- --tui "\$@"
 fi
-exec "\$BIN" "\$@"
+# TUI ekran cizimleri stderr'e gider; log'a yonlendirmek ekrani bos birakir.
+# Bu yuzden arayuz modunda stderr terminalde kalir, CLI modunda log'a yazilir.
+TUI_MOD=0
+for a in "\$@"; do
+  [ "\$a" = "--tui" ] && TUI_MOD=1
+done
+if [ "\$TUI_MOD" = "1" ]; then
+  "\$BIN" "\$@"
+  kod=\$?
+else
+  "\$BIN" "\$@" 2>>"\$LOG"
+  kod=\$?
+fi
+if [ \$kod -ne 0 ]; then
+  echo "--- NetSentinel kod=\$kod ile kapandi; log: \$LOG (son 15 satir) ---"
+  tail -15 "\$LOG" 2>/dev/null
+  if grep -qiE "yetersiz yetki|setcap" "\$LOG" 2>/dev/null; then
+    read -r -p "Aktif tarama (ARP) icin sudo ile tekrar deneyeyim mi? [E/h] " yanit
+    if [ "\$yanit" != "h" ] && [ "\$yanit" != "H" ]; then
+      exec sudo "\$BIN" "\$@"
+    fi
+  fi
+  read -r -p "Kapatmak icin Enter'a bas..."
+fi
 WRAP
     chmod +x "$bindir/net-spectre"
     echo "Kuruldu: $bindir/net-spectre -> uygulama ($hedef)"
@@ -336,6 +374,16 @@ case "${1:-}" in
     ;;
   -l|--list|list)
     list_targets
+    ;;
+  --yetki|yetki)
+    BIN="$ROOT/build/pyi/netspectre/netspectre"
+    if [ ! -x "$BIN" ]; then
+      echo "Once derle: ./netspectre linux binary"; exit 1
+    fi
+    echo "==> ARP yetkisi veriliyor (sudo sifrenizi gireceksiniz)"
+    sudo setcap cap_net_raw,cap_net_admin+eip "$(readlink -f "$BIN")" \
+      && echo "==> yetki verildi: $BIN" \
+      || { echo "HATA: setcap basarisiz"; exit 1; }
     ;;
   --install|install)
     do_install

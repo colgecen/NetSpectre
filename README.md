@@ -88,18 +88,23 @@ netsentinel --config config.yaml
 # Pasif dinleme: hiç paket gönderme, yalnızca mDNS/SSDP duyurularını topla
 netsentinel --passive --no-connect
 
+# TÜM ağlar: görünen ve kayıtlı profili olan her Wi-Fi ağını tek tek dolaş,
+# her birindeki cihazları sınıflandır (şifre asla sorulmaz; kayıtlı profiller)
+netsentinel --all-networks
+
 # JSON/Markdown raporu dosyaya yaz, IP/MAC'leri maskele
 netsentinel --no-connect --export json --anonymize
 
 # Port tarama hızını sınırla (paket/sn)
 netsentinel --no-connect --rate 20
 
-# Etkileşimli Textual arayüzü
+# Etkileşimli Textual arayüzü (tüm ağları arayüzde dolaşmak için --hepsi)
 netsentinel --tui
 ```
 
-TUI kısayolları: `r` yeni tarama · `e` geniş kapsamlı (portlu) tarama · `f` filtreyi
-temizle · başlığa `enter` ile sırala · `q` çıkış.
+TUI kısayolları: `r` yeni tarama · `t` TÜM ağları dolaş · `f` filtre (sadece şüpheliler)
+· `w` beyaz listeye al · `e` rapora disa aktar · basliktaki `enter` ile sirala · `q` çıkış.
+```
 
 ## Nasıl çalışır?
 
@@ -109,7 +114,7 @@ temizle · başlığa `enter` ile sırala · `q` çıkış.
    paralel çalışır; sonuçlar IP/MAC üzerinden birleştirilir
 3. **Port tespiti**: nmap varsa yalnızca `scan.ports` listesi, `scan.rate_limit` hızıyla
    taranır; servis banner'ları toplanır
-4. **Sınıflandırma**: `data/camera_signatures.yaml` imzaları → üretici OUI'si → hostname
+4. **Sınıflandırma**: `src/netsentinel/data/camera_signatures.yaml` imzaları → üretici OUI'si → hostname
    kalıpları sırasıyla denenir; beyaz liste düşülür
 5. **Puanlama**: her bulgu risk puanına gerekçesiyle yazılır; eşik üzerindeki cihazlar
    "şüpheli" olarak işaretlenir

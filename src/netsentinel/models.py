@@ -77,6 +77,7 @@ class Device:
     trusted: bool = False
     first_seen: datetime | None = None
     last_seen: datetime | None = None
+    ssid: str | None = None  # çok ağlı taramada cihazın bulunduğu SSID
 
     def __post_init__(self) -> None:
         self.mac = normalize_mac(self.mac)
@@ -117,6 +118,7 @@ class Device:
             "trusted": self.trusted,
             "first_seen": self.first_seen.isoformat() if self.first_seen else None,
             "last_seen": self.last_seen.isoformat() if self.last_seen else None,
+            "ssid": self.ssid,
         }
 
 

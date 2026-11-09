@@ -1,12 +1,16 @@
 """__main__ giriş noktası testleri — enjekte edilen bağımlılıklarla."""
 
+import os
+import shutil
+import sys
+
 import pytest
 
 from netsentinel.__main__ import build_parser, run
 from netsentinel.discovery.scan import KesifRaporu
 from netsentinel.models import NetworkInfo, ScanResult
 from netsentinel.permissions import PermissionStatus
-from netsentinel.wifi_manager import WifiError
+from netsentinel.wifi_manager import WifiError, WifiNetwork
 
 ROOT_YETKI = PermissionStatus(is_root=True, has_net_raw=True, has_net_admin=True)
 PASIF_YETKI = PermissionStatus(is_root=False, has_net_raw=False, has_net_admin=False)
@@ -39,6 +43,8 @@ class SahteMgr:
         self.hata = hata
         self.connect_cagrilan: list = []
         self.current_cagrilan: list = []
+        self.gorunen: list[str] = ["EvAg_5G", "Komsu_2.4"]
+        self.kayitli: list[str] = ["EvAg_5G"]
 
     def connect(self, preferred, timeout=30):
         self.connect_cagrilan.append((list(preferred), timeout))
@@ -49,6 +55,15 @@ class SahteMgr:
     def current_network(self, iface=None):
         self.current_cagrilan.append(iface)
         return AG_BILGISI
+
+    def scan(self):
+        return [
+            WifiNetwork(ssid=ssid, bssid="AA:BB:CC:00:11:22", signal=60, security="WPA2")
+            for ssid in self.gorunen
+        ]
+
+    def saved_profiles(self):
+        return dict.fromkeys(self.kayitli, "/")
 
 
 @pytest.fixture()
@@ -298,3 +313,119 @@ class TestRaporAkisi:
         assert "YENİ cihaz" in out
         assert "0C:75:D2:AA:BB:CC" in out  # kamera yeni
         assert "11:AA:22:BB:33:CC" not in out.split("YENİ")[1]  # laptop yeni değil
+
+
+class TestCokluAkis:
+    """--all-networks: görünen kayıtlı ağların hepsi sırayla taranır."""
+
+    def test_cli_tum_kayitli_aglari_gezer_atlananlari_bildirir(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.chdir(tmp_path)  # config yok → yerleşik varsayılanlar
+        kod = run(
+            ["--all-networks"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+        )
+        out = capsys.readouterr().out
+        assert kod == 0
+        assert "Ağ: EvAg_5G" in out
+        assert "Atlanan ağlar" in out
+        assert "Komsu_2.4" in out  # profili yok → atlanan
+        assert "kayıtlı NetworkManager profili yok" in out
+        assert "✅ 1 ağ tarandı" in out
+
+    def test_tui_tum_aglar_modunda_kurulur(self):
+        gorulen: dict = {}
+
+        def sahte_tui(app):
+            gorulen["app"] = app
+            return 0
+
+        kod = run(
+            ["--all-networks", "--tui"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+            tui_fn=sahte_tui,
+        )
+        assert kod == 0
+        app = gorulen["app"]
+        assert app.tum_ag_fn is not None
+        assert app._coklu_ag is True
+        assert app._aktif_fn is app.tum_ag_fn
+
+    def test_no_connect_ile_all_networks_tek_ag_devam_eder(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        kod = run(
+            ["--all-networks", "--no-connect"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+        )
+        assert kod == 0  # çok ağlı ama — tek ağ akışına düşer, hata vermez
+        out = capsys.readouterr().out
+        assert "SSID" in out or "ağ bağlantısı" in out.lower()
+
+
+class TestSudoYenidenBaslatma:
+    """Yetki yoksa aracı sudo ile kendimiz yeniden başlatma (üretim yolu)."""
+
+    def test_cevre_kalkani_devre_dısina_alar(self, monkeypatch):
+        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+
+        monkeypatch.setenv(_SU_YOK, "1")
+        assert _sudo_komutu(["--no-connect"]) is None
+
+    def test_root_kullanicida_none(self, monkeypatch):
+        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+
+        monkeypatch.delenv(_SU_YOK, raising=False)
+        monkeypatch.setattr(os, "geteuid", lambda: 0)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(shutil, "which", lambda p: f"/usr/bin/{p}")
+        assert _sudo_komutu([]) is None
+
+    def test_komut_uretimi_sys_python(self, monkeypatch):
+        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+
+        monkeypatch.delenv(_SU_YOK, raising=False)
+        monkeypatch.setattr(os, "geteuid", lambda: 1000)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(shutil, "which", lambda p: f"/usr/bin/{p}")
+        komut = _sudo_komutu(["--no-connect", "--passive"])
+        assert komut[:4] == ["sudo", sys.executable, "-m", "netsentinel"]
+        assert komut[4:] == ["--no-connect", "--passive"]
+
+    def test_active_yetkisizse_sudo_ile_yeniden_baslatilir(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        from netsentinel import __main__ as ns_main
+        from netsentinel.__main__ import _SU_YOK
+
+        monkeypatch.delenv(_SU_YOK, raising=False)
+        monkeypatch.setattr(os, "geteuid", lambda: 1000)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(shutil, "which", lambda p: f"/usr/bin/{p}")
+        monkeypatch.setattr(ns_main, "check_permissions", lambda: PASIF_YETKI)
+        gorulen: dict = {}
+        monkeypatch.setattr(
+            os, "execvpe", lambda prog, argv, env: gorulen.update(prog=prog, argv=argv)
+        )
+
+        kod = run(["--no-connect"], kesif_fn=bos_kesif)  # permission_status enjekte edilmedi
+
+        assert kod == 0
+        assert gorulen.get("prog") == "sudo"
+        assert "sudo ile yeniden başlatılıyor" in capsys.readouterr().out
+
+    def test_tty_yoksa_sudo_istenmez_hata_donmesi(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        from netsentinel.__main__ import _SU_YOK
+
+        monkeypatch.delenv(_SU_YOK, raising=False)
+        monkeypatch.setattr(os, "geteuid", lambda: 1000)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+
+        kod = run(["--no-connect"], kesif_fn=bos_kesif, permission_status=PASIF_YETKI)
+
+        assert kod == 1
+        assert "❌" in capsys.readouterr().err

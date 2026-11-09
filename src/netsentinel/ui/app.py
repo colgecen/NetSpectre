@@ -57,6 +57,7 @@ class NetSentinelApp(App[None]):
 
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
         ("r", "yeniden_tara", "Yeniden tara"),
+        ("t", "tum_aglar", "Tüm ağlar"),
         ("f", "filtre_uygula", "Şüpheliler"),
         ("w", "beyaz_listeye_ekle", "Beyaz liste"),
         ("e", "disa_aktar", "Rapor"),
@@ -68,6 +69,8 @@ class NetSentinelApp(App[None]):
         scan_fn: TaramaFonksiyonu | None = None,
         ssid: str | None = None,
         rapor_yolu: str | Path = VARSAYILAN_RAPOR_YOLU,
+        tum_ag_fn: TaramaFonksiyonu | None = None,
+        ilk_tarama: str = "tek_ag",
     ) -> None:
         super().__init__()
         self.scan_fn: TaramaFonksiyonu = scan_fn if scan_fn is not None else ScanResult
@@ -79,6 +82,11 @@ class NetSentinelApp(App[None]):
         self._secili: Device | None = None
         self._spinner_zamanlayici: Timer | None = None
         self._spinner_adim = 0
+        self.tum_ag_fn: TaramaFonksiyonu | None = tum_ag_fn
+        self._aktif_fn: TaramaFonksiyonu = (
+            tum_ag_fn if (ilk_tarama == "tum_aglar" and tum_ag_fn is not None) else self.scan_fn
+        )
+        self._coklu_ag = ilk_tarama == "tum_aglar"
 
     # ------------------------------------------------------------------ #
     # Kurulum
@@ -106,13 +114,14 @@ class NetSentinelApp(App[None]):
 
     def tara(self) -> None:
         """Taramayı ayrı iş parçacığında başlatır (UI kilitlenmez)."""
-        self.query_one(DurumCubugu).guncelle(self.sonuc, durum="⏳ Tarama sürüyor…")
+        etiket = "🌐 Tüm ağlar taranıyor…" if self._coklu_ag else "⏳ Tarama sürüyor…"
+        self.query_one(DurumCubugu).guncelle(self.sonuc, durum=etiket)
         self._spinner_baslat()
         self._tarama_isi()
 
     @work(thread=True, exclusive=True, group="tarama")
     def _tarama_isi(self) -> ScanResult:
-        return self.scan_fn()
+        return self._aktif_fn()
 
     def on_worker_state_changed(self, message: Worker.StateChanged) -> None:
         worker, state = message.worker, message.state
@@ -122,12 +131,15 @@ class NetSentinelApp(App[None]):
             self.sonuc = worker.result
             self.tarama_sayisi += 1
             self._spinner_durdur()
-            self._ekranlari_ciz(durum="sonuç hazır")
+            etiket = "tüm ağlar tarandı" if self._coklu_ag else "sonuç hazır"
+            self._ekranlari_ciz(durum=etiket)
         elif state is WorkerState.ERROR:
             self._spinner_durdur()
-            self.query_one(DurumCubugu).guncelle(
-                self.sonuc, durum=f"❌ Tarama hatası: {worker.error}"
-            )
+            hata = str(worker.error).lower()
+            mesaj = f"❌ Tarama hatası: {worker.error}"
+            if "yetki" in hata or "permission" in hata or "izin" in hata:
+                mesaj += " — tam tarama (ARP) için 'sudo net-spectre' ile açın"
+            self.query_one(DurumCubugu).guncelle(self.sonuc, durum=mesaj)
 
     def _spinner_baslat(self) -> None:
         self._spinner_durdur()
@@ -176,6 +188,18 @@ class NetSentinelApp(App[None]):
     # ------------------------------------------------------------------ #
 
     def action_yeniden_tara(self) -> None:
+        self.tara()
+
+    def action_tum_aglar(self) -> None:
+        """Görünen kayıtlı Wi-Fi ağlarının hepsini sırayla tara."""
+        if self.tum_ag_fn is None:
+            self.query_one(DurumCubugu).guncelle(
+                self.sonuc,
+                durum="tüm ağlar modu için 'net-spectre --hepsi' ile başlat",
+            )
+            return
+        self._aktif_fn = self.tum_ag_fn
+        self._coklu_ag = True
         self.tara()
 
     def action_filtre_uygula(self) -> None:
