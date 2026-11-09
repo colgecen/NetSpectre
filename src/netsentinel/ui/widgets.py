@@ -62,9 +62,20 @@ class DurumCubugu(Static):
             parcalar.append(f"[dim]{durum}[/dim]")
         return "   ".join(parcalar)
 
-    def guncelle(self, sonuc: ScanResult | None = None, durum: str = "") -> None:
-        """Tarama özetini ve durum mesajını yeniden çizer."""
-        if sonuc is not None and sonuc.network is not None:
+    def guncelle(
+        self,
+        sonuc: ScanResult | None = None,
+        durum: str = "",
+        ssid: str | None = None,
+    ) -> None:
+        """Tarama özetini ve durum mesajını yeniden çizer.
+
+        ``ssid`` verilirse başlıktaki ağ adı geçici olarak o SSID ile
+        değiştirilir (çok ağlı taramada anlık ağı göstermek için).
+        """
+        if ssid is not None:
+            self._ssid = ssid
+        elif sonuc is not None and sonuc.network is not None:
             self._ssid = sonuc.network.ssid
         self._durum = durum
         ozet = sonuc.summary() if sonuc is not None else None

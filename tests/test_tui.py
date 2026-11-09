@@ -151,6 +151,7 @@ async def test_ag_ilerleme_durum_cubugunu_gunceller(tmp_path: Path) -> None:
         await pilot.pause()
         durum = app.query_one(DurumCubugu)
         assert "[2/3] KomsuAg" in durum.durum
+        assert "KomsuAg" in str(durum.render())
 
 
 async def test_t_tum_aglari_tarar_ve_atlanan_gerekceyi_gosterir(tmp_path: Path) -> None:

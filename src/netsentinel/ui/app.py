@@ -126,7 +126,7 @@ class NetSentinelApp(App[None]):
         GUI akışına alınır.
         """
         self.query_one(DurumCubugu).guncelle(
-            self.sonuc, durum=f"🌐 [{sira}/{toplam}] {ssid} taranıyor…"
+            self.sonuc, ssid=ssid, durum=f"🌐 [{sira}/{toplam}] {ssid} taranıyor…"
         )
 
     @work(thread=True, exclusive=True, group="tarama")
