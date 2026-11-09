@@ -88,8 +88,9 @@ netsentinel --config config.yaml
 # Pasif dinleme: hiç paket gönderme, yalnızca mDNS/SSDP duyurularını topla
 netsentinel --passive --no-connect
 
-# TÜM ağlar: görünen ve kayıtlı profili olan her Wi-Fi ağını tek tek dolaş,
-# her birindeki cihazları sınıflandır (şifre asla sorulmaz; kayıtlı profiller)
+# TÜM ağlar: görünen her Wi-Fi'yi listeler; kayıtlı NetworkManager profili
+# olanlara tek tek bağlanıp tarar. Profili olmayanlar "atlanan" olarak
+# gerekçesiyle yazdırılır (şifre denemesi yapılmaz — sadece kayıtlı profiller).
 netsentinel --all-networks
 
 # JSON/Markdown raporu dosyaya yaz, IP/MAC'leri maskele
@@ -98,7 +99,8 @@ netsentinel --no-connect --export json --anonymize
 # Port tarama hızını sınırla (paket/sn)
 netsentinel --no-connect --rate 20
 
-# Etkileşimli Textual arayüzü (tüm ağları arayüzde dolaşmak için --hepsi)
+# Etkileşimli Textual arayüzü; 't' tuşu açılışta da, sonrasında da
+# tüm kayıtlı ağları dolaşabilir
 netsentinel --tui
 ```
 
@@ -158,11 +160,19 @@ ile kendi- kendine yeten Linux paketi üretir (imza/OUI verileri pakete gömül�
 ```bash
 ./netspectre linux appimage   # build/NetSpectre.AppImage (~41 MB, tüm dağıtımlar)
 ./netspectre linux targz      # build/netspectre_Linux_x86_64.tar.gz
-./netspectre --install        # iki komutu kurar
+./netspectre --install        # iki komutu kurar: netspectre (menu) + net-spectre (uygulama)
+./netspectre --yetki          # derlenen ikiliye ARP yetkisi ver (sudo şifre sorar)
 ```
 
-`./netspectre` yazınca interaktif menü açılır. `--install` ise PATH'te iki komut
-kurar — adları birbirine karışmasın:
+Kurulduktan sonra herhangi bir dizinden:
+
+```bash
+netspectre                    # paketleme menüsü
+net-spectre                    # TUI; içinde 't' = tüm kayıtlı ağları dolaş
+net-spectre --hepsi            # açılışta tüm ağlar modu; yetki yoksa sudo önerir
+```
+
+`--install` ise PATH'te iki komut kurar — adları birbirine karışmasın:
 
 | Komut | Ne yapar |
 |---|---|
@@ -238,7 +248,9 @@ Kişisel kullanım ve değiştirmeden dağıtıma izin veren kaynak açık lisan
 
 Bu araç yalnızca kendi sahibi veya yazılı kullanım yetkisi olan kişi/kurumların ağını
 incelemek için verilmiştir. Başkalarının ağını taramak yasadışıdır; geliştirici yanlış
-kullanımdan doğan sorumluluğu kabul etmez.
+kullanımdan doğan sorumluluğu kabul etmez. Çok ağlı mod yalnızca NetworkManager'da
+**hâlihazırda kayıtlı** profilleri kullanır; şifre kırma veya ağlar arası şifre denemesi
+yapılmaz.
 
 ---
 

@@ -354,6 +354,46 @@ class TestCokluAkis:
         assert app._coklu_ag is True
         assert app._aktif_fn is app.tum_ag_fn
 
+    def test_tui_normal_acilista_t_tusu_hazir(self):
+        """'--hepsi' vermeden açılan TUI'de de 't' çalışır (açılışta tek ağ tarar)."""
+        gorulen: dict = {}
+
+        def sahte_tui(app):
+            gorulen["app"] = app
+            return 0
+
+        kod = run(
+            ["--tui", "--no-connect"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+            tui_fn=sahte_tui,
+        )
+        assert kod == 0
+        app = gorulen["app"]
+        assert app.tum_ag_fn is not None
+        assert app._coklu_ag is False
+        assert app._aktif_fn is app.scan_fn
+
+    def test_tui_tum_ag_sonucunda_atlanan_gerekceleri_tasinir(self):
+        gorulen: dict = {}
+
+        def sahte_tui(app):
+            gorulen["app"] = app
+            return 0
+
+        run(
+            ["--all-networks", "--tui"],
+            wifi_manager=SahteMgr(),
+            permission_status=ROOT_YETKI,
+            kesif_fn=bos_kesif,
+            tui_fn=sahte_tui,
+        )
+        sonuc = gorulen["app"].tum_ag_fn()
+        # 'Komsu_2.4' görünür ama profili yok; neden arayüzde görünebilir olmalı.
+        assert any("Komsu_2.4" in not_ for not_ in sonuc.notlar)
+        assert "kayıtlı NetworkManager profili yok" in sonuc.notlar[0]
+
     def test_no_connect_ile_all_networks_tek_ag_devam_eder(self, tmp_path, capsys, monkeypatch):
         monkeypatch.chdir(tmp_path)
         kod = run(

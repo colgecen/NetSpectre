@@ -294,7 +294,17 @@ def run(
         return 1
 
     if args.tui:
-        app = _tui_hazirla(cfg, durum, info, kesif_fn)
+        # 't' tuşu her TUI açılışında çalışsın: '--hepsi' yalnızca açılış
+        # davranışını seçer, 't' sonradan da tüm ağları taramayı mümkün kılar.
+        app = _tui_hazirla(
+            cfg,
+            durum,
+            info,
+            kesif_fn,
+            mgr=mgr,
+            tum_ag_fn=lambda: tum_aglari_tara(mgr, cfg, kesif_fn).bilesik,
+            ilk_tarama="tek_ag",
+        )
         calistir = tui_fn if tui_fn is not None else (lambda a: int(a.run() or 0))
         return calistir(app)
 

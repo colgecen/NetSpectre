@@ -132,6 +132,8 @@ class NetSentinelApp(App[None]):
             self.tarama_sayisi += 1
             self._spinner_durdur()
             etiket = "tüm ağlar tarandı" if self._coklu_ag else "sonuç hazır"
+            if self._coklu_ag and self.sonuc is not None and getattr(self.sonuc, "notlar", None):
+                etiket += f" · {len(self.sonuc.notlar)} ağ atlandı"
             self._ekranlari_ciz(durum=etiket)
         elif state is WorkerState.ERROR:
             self._spinner_durdur()

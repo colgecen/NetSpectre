@@ -11,8 +11,9 @@ from netsentinel.wifi_manager import (
     match_preferred,
     parse_dev_status,
     parse_ip_config,
-    parse_saved_profiles,
+    parse_profile_rows,
     parse_wifi_list,
+    parse_wireless_ssid,
 )
 
 # Gerçek 'nmcli -t -f SSID,BSSID,SIGNAL,SECURITY dev wifi list' biçimi:
@@ -35,6 +36,19 @@ IP_CONFIG = """IP4.GATEWAY:192.168.1.1
 IP4.ADDRESS[1]:192.168.1.42/24
 IP4.DNS[1]:192.168.1.1
 """
+
+# Modern nmcli: genel 'SSID' alanı yoktur; kablosuz profiller ayrıca sorgulanır.
+PROFILE_LIST = """EvAg_5G:802-11-wireless:uuid-5g
+EvAg_2.4G:802-11-wireless:uuid-24g
+Kahve\\:Net:802-11-wireless:uuid-kahve
+Kablolu:802-3-ethernet:uuid-eth
+"""
+
+PROFILE_SSIDS = {
+    "uuid-5g": "EvAg_5G",
+    "uuid-24g": "EvAg_2.4G",
+    "uuid-kahve": "Kahve:Net",
+}
 
 
 def test_wifi_list_ayristirma():
@@ -98,12 +112,19 @@ def test_ip_config_bos_cikti():
     assert parse_ip_config("") == (None, None)
 
 
-def test_saved_profiles():
-    metin = "EvAg_5G:EvAg_5G\nKahve\\:Net:Kahve\\:Net\neth0-Hasarli:\n"
-    prof = parse_saved_profiles(metin)
-    assert prof["EvAg_5G"] == "EvAg_5G"
-    assert prof["Kahve:Net"] == "Kahve:Net"
-    assert "" not in prof
+def test_profile_rows_ayristirma():
+    rows = parse_profile_rows(PROFILE_LIST)
+    assert ("EvAg_5G", "802-11-wireless", "uuid-5g") in rows
+    assert ("Kahve:Net", "802-11-wireless", "uuid-kahve") in rows
+    assert ("Kablolu", "802-3-ethernet", "uuid-eth") in rows
+    assert len(rows) == 4
+
+
+def test_wireless_ssid_ayristirma():
+    assert parse_wireless_ssid("EvAg_5G\n") == "EvAg_5G"
+    assert parse_wireless_ssid("Kahve\\:Net") == "Kahve:Net"
+    assert parse_wireless_ssid("802-11-wireless.ssid:EvAg_5G") == "EvAg_5G"
+    assert parse_wireless_ssid("") == ""
 
 
 # --------------------------------------------------------------------------- #
@@ -125,8 +146,11 @@ class SahteNmcli:
             return WIFI_LIST
         if "dev wifi list ifname" in anahtar:
             return r"yes:AA\:BB\:CC\:00\:11\:22:EvAg_5G" + "\n"
-        if "con show" in anahtar:
-            return "EvAg_5G:EvAg_5G\nEvAg_2.4G:EvAg_2.4G\n"
+        if "802-11-wireless.ssid" in anahtar and "con" in anahtar and "show" in anahtar:
+            uuid = args[-1]
+            return PROFILE_SSIDS.get(uuid, "") + "\n"
+        if "NAME,TYPE,UUID" in anahtar:
+            return PROFILE_LIST
         if "dev status" in anahtar:
             return DEV_STATUS
         if "dev show" in anahtar:
@@ -224,11 +248,58 @@ def test_shell_true_kullanilmaz_ilmli_dogrulama():
 
 
 def test_saved_profiles_modern_nmcli_kullanir():
-    """Regresyon: eski 'con list' sözdizimi modern nmcli'de hata veriyordu."""
+    """Regresyon: eski 'con list'/NAME,SSID sözdizimi modern nmcli'de hata veriyor."""
     sahte = SahteNmcli()
     mgr = WifiManager(runner=sahte)
     profiller = mgr.saved_profiles()
-    assert profiller == {"EvAg_5G": "EvAg_5G", "EvAg_2.4G": "EvAg_2.4G"}
-    cagri = next(c for c in sahte.cagrilan if "con" in c)
-    assert "show" in cagri
-    assert "list" not in cagri
+    assert profiller == {
+        "EvAg_5G": "EvAg_5G",
+        "EvAg_2.4G": "EvAg_2.4G",
+        "Kahve:Net": "Kahve:Net",
+    }
+    liste_cagri = next(c for c in sahte.cagrilan if "NAME,TYPE,UUID" in " ".join(c))
+    assert liste_cagri[-2:] == ["con", "show"]  # 'list' değil, 'show'
+    assert not any("SSID" in " ".join(c) and "NAME,SSID" in " ".join(c) for c in sahte.cagrilan)
+
+
+def test_saved_profiles_tek_profil_hatasi_atlanir():
+    """Bir profilin SSID'si okunamazsa ölme; geri kalanını döndür."""
+
+    def runner(args, timeout):
+        k = " ".join(args)
+        if "NAME,TYPE,UUID" in k:
+            return PROFILE_LIST
+        if "802-11-wireless.ssid" in k and k.endswith("uuid-kahve"):
+            raise WifiError("profil hatası")
+        if "802-11-wireless.ssid" in k:
+            return PROFILE_SSIDS.get(args[-1], "") + "\n"
+        return ""
+
+    mgr = WifiManager(runner=runner)
+    assert mgr.saved_profiles() == {
+        "EvAg_5G": "EvAg_5G",
+        "EvAg_2.4G": "EvAg_2.4G",
+    }
+
+
+def test_saved_profiles_sadece_kablosuz_hatalar_baslaniyor():
+    """Kablolu profil 'saved_profiles' sonucuna karışmaz; sadece kablosuz bağlanılır."""
+    mgr = WifiManager(runner=SahteNmcli())
+    assert "Kablolu" not in mgr.saved_profiles()
+
+
+def test_baglanti_oturdu_ip_gelene_kadar_sinirli_bekler(monkeypatch):
+    from netsentinel import wifi_manager as wm
+    from netsentinel.models import NetworkInfo
+
+    bekleyen: list[int] = []
+
+    class Mgr(WifiManager):
+        def current_network(self, iface=None):
+            bekleyen.append(1)
+            return NetworkInfo(ssid="Ev", iface="wlan0")
+
+    monkeypatch.setattr(wm.time, "sleep", lambda _s: None)
+    bilgi = Mgr()._baglanti_oturdu_mu(deneme=3, ara=0)
+    assert bilgi.ssid == "Ev"
+    assert len(bekleyen) == 3  # IP hiç gelmedi ama sonsuz döngüye düşmedi

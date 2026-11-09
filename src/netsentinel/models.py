@@ -159,6 +159,7 @@ class ScanResult:
     started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
     yeni_cihazlar: list[str] = field(default_factory=list)  # önceki taramada olmayan MAC'ler
+    notlar: list[str] = field(default_factory=list)  # çok ağlı tarama gerekçeleri
 
     def add_device(self, device: Device) -> None:
         """MAC üzerinden tekilleştirerek cihaz ekler; varsa zaman damgasını günceller."""

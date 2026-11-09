@@ -49,7 +49,10 @@ class CokluSonuc:
     def bilesik(self) -> ScanResult:
         """Tüm ağların cihazlarını tek listede; ağ alanı ilk başarılı ağı gösterir."""
         ag0 = self.aglar[0].network if self.aglar else NetworkInfo(ssid="—", iface="—")
-        return ScanResult(network=ag0, devices=self.cihazlar)
+        birlesik = ScanResult(network=ag0, devices=self.cihazlar)
+        # TUI/CLI ekranı neden taranamadığını görsün: profili olmayan ağların gerekçesi.
+        birlesik.notlar = [f"{ssid}: {neden}" for ssid, neden in self.atlanan]
+        return birlesik
 
     def ozet(self) -> dict[str, int]:
         oz: dict[str, int] = {"ag": len(self.aglar), "atlanan": len(self.atlanan)}
@@ -79,14 +82,23 @@ class CokluAgProfili(Protocol):
 def hedefleri_sec(
     gorunen: Sequence[WifiNetwork], kayitli: dict[str, str]
 ) -> tuple[list[WifiNetwork], list[tuple[str, str]]]:
-    """Görünen ağları kayıtlı olanlar / atlananlar (gerekçeli) olarak ayırır."""
+    """Görünen ağları kayıtlı olanlar / atlananlar (gerekçeli) olarak ayırır.
+
+    Aynı SSID'nin birden çok AP'si (ör. 2.4/5 GHz aynı ad) gelirse tek taranır;
+    en güçlü AP seçilir. Hedefler sinyal azalan sırada yürütülür.
+    """
+    en_iyi: dict[str, WifiNetwork] = {}
+    for ag in gorunen:
+        mevcut = en_iyi.get(ag.ssid)
+        if mevcut is None or ag.signal > mevcut.signal:
+            en_iyi[ag.ssid] = ag
     hedefler: list[WifiNetwork] = []
     atlanan: list[tuple[str, str]] = []
-    for ag in gorunen:
-        if ag.ssid in kayitli:
+    for ssid, ag in sorted(en_iyi.items(), key=lambda x: (-x[1].signal, x[0])):
+        if ssid in kayitli:
             hedefler.append(ag)
         else:
-            atlanan.append((ag.ssid, "kayıtlı NetworkManager profili yok"))
+            atlanan.append((ssid, "kayıtlı NetworkManager profili yok"))
     return hedefler, atlanan
 
 

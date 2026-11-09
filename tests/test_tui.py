@@ -4,7 +4,7 @@ from pathlib import Path
 
 from netsentinel.models import Device, NetworkInfo, ScanResult
 from netsentinel.ui.app import NetSentinelApp
-from netsentinel.ui.widgets import CihazTablosu, DetayPanel
+from netsentinel.ui.widgets import CihazTablosu, DetayPanel, DurumCubugu
 
 KAMERA_MAC = "0C:75:D2:AA:BB:CC"
 SARI_MAC = "9A:1B:2C:3D:4E:5F"
@@ -143,7 +143,30 @@ async def test_r_yeniden_tara_sayaci_artirir(tmp_path: Path) -> None:
         assert app.tarama_sayisi == onceki + 1
 
 
-async def test_q_cikisi_baslatir(tmp_path: Path) -> None:
+async def test_t_tum_aglari_tarar_ve_atlanan_gerekceyi_gosterir(tmp_path: Path) -> None:
+    tek = ScanResult(network=NetworkInfo(ssid="EvWifi", iface="wlan0"), devices=[])
+
+    def tek_fn() -> ScanResult:
+        return tek
+
+    def tum() -> ScanResult:
+        coklu = ScanResult(network=NetworkInfo(ssid="EvWifi", iface="wlan0"), devices=[])
+        coklu.notlar = ["KomsuNet: kayıtlı NetworkManager profili yok"]
+        return coklu
+
+    app = NetSentinelApp(tek_fn, ssid="EvWifi", tum_ag_fn=tum, rapor_yolu=tmp_path / "r.json")
+    async with app.run_test() as pilot:
+        await taramayi_bekle(app, pilot)
+        onceki = app.tarama_sayisi
+        await pilot.press("t")
+        for _ in range(200):
+            await pilot.pause(0.05)
+            if app.tarama_sayisi > onceki:
+                break
+        assert app._coklu_ag is True
+        assert app.sonuc is not None and any("KomsuNet" in not_ for not_ in app.sonuc.notlar)
+        durum = app.query_one(DurumCubugu)
+        assert "1 ağ atlandı" in durum.durum
     app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)

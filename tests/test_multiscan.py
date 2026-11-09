@@ -81,6 +81,13 @@ def test_hedefleri_sec_kayitli_olmayanlari_atlanan_olarak_ayirir():
     assert atlanan == [("Komsu", "kayıtlı NetworkManager profili yok")]
 
 
+def test_hedefleri_sec_ayni_ssid_tek_kez_taranir():
+    hedefler, atlanan = hedefleri_sec([ag("Ev", 40), ag("Ev", 90), ag("Komsu", 70)], {"Ev": "/"})
+    assert [a.ssid for a in hedefler] == ["Ev"]
+    assert hedefler[0].signal == 90  # en güçlü AP seçildi
+    assert atlanan == [("Komsu", "kayıtlı NetworkManager profili yok")]
+
+
 def test_tum_aglari_tara_butun_kayitli_aglari_gezer_ve_etiketler():
     mgr = SahteMgr([ag("Ev"), ag("Misafir"), ag("Komsu")], ["Ev", "Misafir"])
     cfg = AppConfig()

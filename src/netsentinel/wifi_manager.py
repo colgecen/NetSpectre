@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -122,24 +123,27 @@ def parse_dev_status(text: str) -> list[dict[str, str]]:
     return rows
 
 
-def parse_saved_profiles(text: str) -> dict[str, str]:
-    """``nmcli -t -f NAME,SSID con show`` → {ssid: profil_adı}.
-
-    Bir profilin SSID alanı birden çok ağ içerebilir; ilk (birincil) SSID kullanılır.
-    """
-    profiles: dict[str, str] = {}
+def parse_profile_rows(text: str) -> list[tuple[str, str, str]]:
+    """``nmcli -t -f NAME,TYPE,UUID con show`` çıktısını (ad, tür, uuid) satırlarına ayırır."""
+    rows: list[tuple[str, str, str]] = []
     for line in text.splitlines():
-        parts = _split_terse(line.strip(), 2)
+        parts = _split_terse(line.strip(), 3)
         if parts is None:
+            continue  # açıklayıcı satır veya bozuk kayıt
+        ad, tur, uuid = parts
+        if not ad or not uuid:
             continue
-        name, ssid_field = parts
-        if not name or not ssid_field:
-            continue
-        # wireless.ssid birden çok ağ içerebilir; virgülle ayrılır, birincil ilk SSID'dir
-        primary = ssid_field.split(",")[0].strip()
-        if primary:
-            profiles.setdefault(primary, name)
-    return profiles
+        rows.append((ad, tur, uuid))
+    return rows
+
+
+def parse_wireless_ssid(text: str) -> str:
+    """``nmcli -g 802-11-wireless.ssid`` çıktısını temiz SSID metnine çevirir."""
+    metin = text.strip().splitlines()[0] if text.strip() else ""
+    if metin.startswith("802-11-wireless.ssid:"):
+        # `-g` yalnızca değer döndürür; eski/beklenmedik çıktıya karşı yine de korumalı ol.
+        metin = metin.split(":", 1)[1].strip()
+    return _unescape(metin)
 
 
 def parse_ip_config(text: str) -> tuple[str | None, str | None]:
@@ -237,9 +241,27 @@ class WifiManager:
         return parse_wifi_list(out)
 
     def saved_profiles(self) -> dict[str, str]:
-        """Kayıtlı NetworkManager profilleri: {ssid: profil_adı}."""
-        # nmcli'de 'con list' eski söz dizimidir; modern sürüm 'con show' ister.
-        return parse_saved_profiles(self._run(["-t", "-f", "NAME,SSID", "con", "show"], 10))
+        """Kayıtlı NetworkManager profilleri: {ssid: profil_adı}.
+
+        Modern nmcli'de ``SSID`` genel bir profil alanı değildir; bu yüzden
+        önce kablosuz profiller listelenir, sonra her profil için
+        ``802-11-wireless.ssid`` ayrıca sorgulanır (UUID ile).
+        """
+        satirlar = self._run(["-t", "-f", "NAME,TYPE,UUID", "con", "show"], 10)
+        profiller: dict[str, str] = {}
+        for ad, tur, uuid in parse_profile_rows(satirlar):
+            if "wireless" not in tur:
+                continue
+            try:
+                ssid = parse_wireless_ssid(
+                    self._run(["-g", "802-11-wireless.ssid", "con", "show", "uuid", uuid], 5)
+                )
+            except WifiError:
+                # Tek bir profilin kimliği okunamazsa onu atla; diğerlerini tara.
+                continue
+            if ssid:
+                profiller.setdefault(ssid, ad)
+        return profiller
 
     def dev_status(self) -> list[dict[str, str]]:
         return parse_dev_status(
@@ -273,10 +295,25 @@ class WifiManager:
             except WifiError as exc:
                 hatalar.append(f"{target.ssid}: {exc}")
                 continue
-            return self.current_network()
+            return self._baglanti_oturdu_mu()
         raise WifiError(
             "Tercih edilen ağların tümüne bağlanılamadı:\n  - " + "\n  - ".join(hatalar)
         )
+
+    def _baglanti_oturdu_mu(self, deneme: int = 5, ara: float = 0.5) -> NetworkInfo:
+        """Bağlantı kurulduktan sonra DHCP/IP adresinin oturmasını kısa bekler.
+
+        'con up' başarılı olsa bile IP adresi hemen gelmeyebilir; bu yüzden
+        ağ geçidi görünmeden kısa ve sınırlı beklenir.
+        """
+        son_bilgi: NetworkInfo | None = None
+        for _ in range(deneme):
+            son_bilgi = self.current_network()
+            if son_bilgi.gateway or son_bilgi.cidr:
+                return son_bilgi
+            time.sleep(ara)
+        assert son_bilgi is not None  # deneme en az 1
+        return son_bilgi
 
     def current_network(self, iface: str | None = None) -> NetworkInfo:
         """Şu an bağlı olunan Wi-Fi ağının bilgisini döner."""
