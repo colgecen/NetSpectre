@@ -9,11 +9,13 @@ ağa bağlanıp tarar.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
@@ -29,6 +31,9 @@ from netsentinel.permissions import (
     ensure_scan_permissions,
 )
 from netsentinel.wifi_manager import WifiError, WifiManager
+
+if TYPE_CHECKING:
+    from netsentinel.ui.app import NetSentinelApp
 
 _ACIKLAMA = "Kendi Wi-Fi ağınızdaki gizli kamera ve bilinmeyen IoT cihazlarını tespit eder."
 _VARSAYILAN_CONFIG = "config.yaml"
@@ -132,7 +137,7 @@ def _tui_hazirla(
     mgr: WifiManager | None = None,
     tum_ag_fn: Callable[[], ScanResult] | None = None,
     ilk_tarama: str = "tek_ag",
-) -> object:
+) -> NetSentinelApp:
     """TUI uygulamasını enjekte edilmiş tarama fonksiyonuyla kurar."""
     from netsentinel.ui.app import NetSentinelApp
 
@@ -274,13 +279,19 @@ def run(
     coklu = args.all_networks and not args.no_connect
 
     if coklu and args.tui:
+
+        def ilerleme(ssid: str, sira: int, toplam: int) -> None:
+            # Tarama iş parçacığından güvenle durum çubuğunu güncelle.
+            with contextlib.suppress(RuntimeError, ValueError):
+                app.call_from_thread(app.ag_ilerleme, sira, toplam, ssid)
+
         app = _tui_hazirla(
             cfg,
             durum,
             _sessiz_geridonus(mgr),
             kesif_fn,
             mgr=mgr,
-            tum_ag_fn=lambda: tum_aglari_tara(mgr, cfg, kesif_fn).bilesik,
+            tum_ag_fn=lambda: tum_aglari_tara(mgr, cfg, kesif_fn, ilerleme=ilerleme).bilesik,
             ilk_tarama="tum_aglar",
         )
         calistir = tui_fn if tui_fn is not None else (lambda a: int(a.run() or 0))
@@ -298,13 +309,18 @@ def run(
     if args.tui:
         # 't' tuşu her TUI açılışında çalışsın: '--hepsi' yalnızca açılış
         # davranışını seçer, 't' sonradan da tüm ağları taramayı mümkün kılar.
+
+        def ilerleme(ssid: str, sira: int, toplam: int) -> None:
+            with contextlib.suppress(RuntimeError, ValueError):
+                app.call_from_thread(app.ag_ilerleme, sira, toplam, ssid)
+
         app = _tui_hazirla(
             cfg,
             durum,
             info,
             kesif_fn,
             mgr=mgr,
-            tum_ag_fn=lambda: tum_aglari_tara(mgr, cfg, kesif_fn).bilesik,
+            tum_ag_fn=lambda: tum_aglari_tara(mgr, cfg, kesif_fn, ilerleme=ilerleme).bilesik,
             ilk_tarama="tek_ag",
         )
         calistir = tui_fn if tui_fn is not None else (lambda a: int(a.run() or 0))

@@ -143,6 +143,16 @@ async def test_r_yeniden_tara_sayaci_artirir(tmp_path: Path) -> None:
         assert app.tarama_sayisi == onceki + 1
 
 
+async def test_ag_ilerleme_durum_cubugunu_gunceller(tmp_path: Path) -> None:
+    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+    async with app.run_test() as pilot:
+        await taramayi_bekle(app, pilot)
+        app.ag_ilerleme(2, 3, "KomsuAg")
+        await pilot.pause()
+        durum = app.query_one(DurumCubugu)
+        assert "[2/3] KomsuAg" in durum.durum
+
+
 async def test_t_tum_aglari_tarar_ve_atlanan_gerekceyi_gosterir(tmp_path: Path) -> None:
     tek = ScanResult(network=NetworkInfo(ssid="EvWifi", iface="wlan0"), devices=[])
 

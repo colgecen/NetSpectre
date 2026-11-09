@@ -119,6 +119,16 @@ class NetSentinelApp(App[None]):
         self._spinner_baslat()
         self._tarama_isi()
 
+    def ag_ilerleme(self, sira: int, toplam: int, ssid: str) -> None:
+        """Çok ağlı taramada anlık ilerlemeyi durum çubuğunda gösterir.
+
+        Tarama iş parçacığından gelen çağrılar ``call_from_thread`` ile
+        GUI akışına alınır.
+        """
+        self.query_one(DurumCubugu).guncelle(
+            self.sonuc, durum=f"🌐 [{sira}/{toplam}] {ssid} taranıyor…"
+        )
+
     @work(thread=True, exclusive=True, group="tarama")
     def _tarama_isi(self) -> ScanResult:
         return self._aktif_fn()
