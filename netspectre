@@ -110,24 +110,26 @@ else
   done
   [ "\$TUM" = "1" ] && set -- --tui "\$@"
 fi
-# '--hepsi' tam tarama demektir: ARP yetkisi yoksa sudo ile baslatmayi oner.
-# Ikiliye setcap uygulanmissa (netspectre --yetki) sormaz, dogrudan calisir.
-if [ "\${TUM:-0}" = "1" ] && [ "\$(id -u)" != "0" ]; then
+# TUI ekran cizimleri stderr'e gider; log'a yonlendirmek ekrani bos birakir.
+# Bu yuzden arayuz modunda stderr terminalde kalir, CLI modunda log'a yazilir.
+TUI_MOD=0
+PASIF_MOD=0
+for a in "\$@"; do
+  [ "\$a" = "--tui" ] && TUI_MOD=1
+  [ "\$a" = "--passive" ] && PASIF_MOD=1
+done
+# Aktif modda TUI acilacaksa ve ikilide ARP yetkisi yoksa sudo ile baslatmayi
+# oner. '--passive' ile acilis yetki istemez; setcap uygulanmissa da sormaz.
+if [ "\$TUI_MOD" = "1" ] && [ "\$PASIF_MOD" = "0" ] && [ "\$(id -u)" != "0" ]; then
   if ! getcap -v -- "\$BIN" 2>/dev/null | grep -q cap_net_raw; then
     echo "Tam tarama (ARP) icin sudo yetkisi gerekiyor."
     read -r -p "sudo ile baslatayim mi? [E/h] " yanit
     if [ "\$yanit" != "h" ] && [ "\$yanit" != "H" ]; then
       exec sudo "\$BIN" "\$@"
     fi
-    echo "Yetkisiz devam ediliyor — yalnizca pasif kesif calisir."
+    echo "Yetkisiz devam ediliyor — arayuz pasif modda acilacak."
   fi
 fi
-# TUI ekran cizimleri stderr'e gider; log'a yonlendirmek ekrani bos birakir.
-# Bu yuzden arayuz modunda stderr terminalde kalir, CLI modunda log'a yazilir.
-TUI_MOD=0
-for a in "\$@"; do
-  [ "\$a" = "--tui" ] && TUI_MOD=1
-done
 if [ "\$TUI_MOD" = "1" ]; then
   "\$BIN" "\$@"
   kod=\$?

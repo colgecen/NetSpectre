@@ -130,6 +130,19 @@ class TestRun:
         assert kod == 0
         assert "mod=passive" in capsys.readouterr().out
 
+    def test_pasif_mod_yetki_yarisi_yazmaz(self, cfg_dosyasi, capsys):
+        mgr = SahteMgr()
+        kod = run(
+            ["--config", cfg_dosyasi, "--passive", "--no-connect"],
+            wifi_manager=mgr,
+            permission_status=PASIF_YETKI,
+            kesif_fn=bos_kesif,
+        )
+        assert kod == 0
+        cikan = capsys.readouterr()
+        assert "mod=passive" in cikan.out
+        assert "Yetersiz yetki" not in cikan.err + cikan.out
+
     def test_aktif_mod_yetkisiz_kullanici_1_doner(self, cfg_dosyasi, capsys):
         mgr = SahteMgr()
         kod = run(

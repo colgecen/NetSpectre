@@ -170,7 +170,11 @@ Kurulduktan sonra herhangi bir dizinden:
 netspectre                    # paketleme menüsü
 net-spectre                    # TUI; içinde 't' = tüm kayıtlı ağları dolaş
 net-spectre --hepsi            # açılışta tüm ağlar modu; yetki yoksa sudo önerir
+net-spectre --passive --no-connect  # yetki istemez, yalnızca dinleme
 ```
+
+Aktif modda açılan TUI’de ARP yetkisi yoksa `net-spectre` wrapper’ı sudo ile
+yeniden başlatmayı önerir. Retmek için `--passive --no-connect` kullanılabilir.
 
 `--install` ise PATH'te iki komut kurar — adları birbirine karışmasın:
 

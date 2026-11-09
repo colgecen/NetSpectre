@@ -247,8 +247,10 @@ def run(
         cfg.output.anonymize = True
 
     durum = permission_status if permission_status is not None else check_permissions()
-    for w in durum.warnings:
-        print(w, file=sys.stderr)
+    if cfg.scan.mode == "active":
+        # Pasif modda yetki uyarisi gereksiz gürültüdür.
+        for w in durum.warnings:
+            print(w, file=sys.stderr)
     if args.tui and cfg.scan.mode == "active" and not durum.can_scan:
         # TUI asla yetki hatasıyla açılmadan kapanmasın: pasife düş, bildir.
         cfg.scan.mode = "passive"
