@@ -58,8 +58,15 @@ git clone https://github.com/colgecen/NetSpectre.git
 cd NetSpectre
 python3 -m venv .venv && source .venv/bin/activate
 pip install .
-netsentinel --no-connect            # bağlı olduğun ağda hızlı tarama
+net-spectre                    # TUI açılır, tüm kayıtlı ağları dolaşır
+netsentinel --no-connect      # yalnızca bağlı olduğun ağı hızlı tarar
 ```
+
+`pip install .` kurulumu iki komut verir: `netsentinel` (klasik CLI) ve
+`net-spectre` (uygulama arayüzü, argümansız TUI). Depo kökündeki `netspectre`
+dosyası ise **paketleme menüsüdür**, `pip install .` tarafından **otomatik
+kurulmaz**; sadece bu depoyu indiren geliştirici/donanım kullanıcısı
+`./netspectre` ile çalıştırır.
 
 `config.yaml` zorunlu değildir; araç yerleşik güvenli varsayılanlarla çalışır. Ağ seçimi
 veya beyaz liste için şablondan kopyala: `cp config.example.yaml config.yaml`.

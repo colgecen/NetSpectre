@@ -482,3 +482,40 @@ class TestSudoYenidenBaslatma:
 
         assert kod == 1
         assert "❌" in capsys.readouterr().err
+
+
+def test_main_net_spectre_argsiz_tui_ve_hepsi_baslatir(monkeypatch):
+    from netsentinel import __main__ as giris
+
+    gorulen: list[list[str] | None] = []
+
+    def sahte_run(argv=None):
+        gorulen.append(argv)
+        return 0
+
+    monkeypatch.setattr(giris, "run", sahte_run)
+    monkeypatch.setattr(sys, "argv", ["net-spectre"])
+
+    with pytest.raises(SystemExit) as cikis:
+        giris.main_net_spectre()
+
+    assert cikis.value.code == 0
+    assert gorulen == [["--tui", "--hepsi"]]
+
+
+def test_main_net_spectre_argumanlarda_oldigi_gibi_gecer(monkeypatch):
+    from netsentinel import __main__ as giris
+
+    gorulen: list[list[str] | None] = []
+
+    def sahte_run(argv=None):
+        gorulen.append(argv)
+        return 0
+
+    monkeypatch.setattr(giris, "run", sahte_run)
+
+    with pytest.raises(SystemExit) as cikis:
+        giris.main_net_spectre(["--passive", "--no-connect"])
+
+    assert cikis.value.code == 0
+    assert gorulen == [["--passive", "--no-connect"]]

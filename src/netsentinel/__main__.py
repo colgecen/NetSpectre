@@ -374,5 +374,17 @@ def main(argv: list[str] | None = None) -> None:
     sys.exit(run(argv))
 
 
+def main_net_spectre(argv: list[str] | None = None) -> None:
+    """``net-spectre`` giriş noktası: argümansızsa TUI + tüm ağlar modunu açar.
+
+    Repo kökündeki bash sarmalayıcısı yoksa (örneğin ``pip install .``
+    sonrası) bu giriş noktası aynı varsayılan davranışı uygular.
+    """
+    bayraklar = list(argv) if argv is not None else sys.argv[1:]
+    if not bayraklar:
+        bayraklar = ["--tui", "--hepsi"]
+    sys.exit(run(bayraklar))
+
+
 if __name__ == "__main__":
     main()

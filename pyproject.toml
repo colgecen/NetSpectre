@@ -47,7 +47,7 @@ packaging = [
 
 [project.scripts]
 netsentinel = "netsentinel.__main__:main"
-netspectre = "netsentinel.__main__:main"
+net-spectre = "netsentinel.__main__:main_net_spectre"
 
 [tool.setuptools.packages.find]
 where = ["src"]
