@@ -64,11 +64,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
+          PRERELEASE=""
+          case "$TAG" in
+            *-rc.*) PRERELEASE="--prerelease" ;;
+          esac
           if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" $PRERELEASE
             gh release upload "$TAG" dist/* --clobber
           else
             gh release create "$TAG" dist/* \
               --verify-tag \
               --title "$TAG" \
+              $PRERELEASE \
               --generate-notes
           fi
