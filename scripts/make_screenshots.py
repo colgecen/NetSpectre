@@ -44,14 +44,14 @@ def fleet() -> ScanResult:
     devices = [
         Device(
             ip="192.168.1.1",
-            mac="F4:EC:FB:00:00:01",
+            mac="F4:EC:FB",
             vendor="TP-Link",
             hostname="fiber-modem",
             open_ports=[80, 443],
         ),
         Device(
             ip="192.168.1.50",
-            mac="0C:75:D2:00:00:01",
+            mac="0C:75:D2",
             vendor="Hangzhou Hikvision",
             hostname="office-cam",
             open_ports=[80, 554, 8000],
@@ -59,31 +59,31 @@ def fleet() -> ScanResult:
         ),
         Device(
             ip="192.168.1.51",
-            mac="3C:E3:6B:00:00:01",
+            mac="3C:E3:6B",
             vendor="Dahua",
             hostname="dahua-nvr",
             open_ports=[37777, 80],
         ),
         Device(
             ip="192.168.1.61",
-            mac="A0:B7:65:00:00:01",
+            mac="A0:B7:65",
             vendor="Espressif (ESP32)",
             hostname="ESP_A1B2C3",
             open_ports=[8080],
         ),
         Device(
             ip="192.168.1.72",
-            mac="9A:1B:2C:3D:4E:5F",
+            mac="9A:1B:2C",
         ),
         Device(
             ip="192.168.1.80",
-            mac="F0:18:98:00:00:01",
+            mac="F0:18:98",
             vendor="Apple, Inc.",
             hostname="living-room-iphone",
         ),
         Device(
             ip="192.168.1.90",
-            mac="00:1B:44:00:00:01",
+            mac="00:1B:44",
             vendor="TP-Link",
             hostname="tapo-plug",
             trusted=True,
@@ -94,7 +94,7 @@ def fleet() -> ScanResult:
     return sonuc_analiz(
         result,
         ImzaKumesi.varsayilan(),
-        whitelist={"00:1B:44:00:00:01": "smart plug"},
+        whitelist={"00:1B:44": "smart plug"},
         gateway_ip="192.168.1.1",
     )
 
