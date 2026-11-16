@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from netsentinel.models import (
+from netspectre.models import (
     Device,
     DeviceType,
     NetworkInfo,

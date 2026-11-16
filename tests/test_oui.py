@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from netsentinel.analyzer.oui import VARSAYILAN_OUI_YOLU, OuiVeritabani
+from netspectre.analyzer.oui import VARSAYILAN_OUI_YOLU, OuiVeritabani
 
 MINI = {"AA:BB:CC": "Test Kamera A.Ş.", "11:22:33": "Telefon Korp."}
 

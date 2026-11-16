@@ -6,11 +6,11 @@ import sys
 
 import pytest
 
-from netsentinel.__main__ import build_parser, run
-from netsentinel.discovery.scan import KesifRaporu
-from netsentinel.models import NetworkInfo, ScanResult
-from netsentinel.permissions import PermissionStatus
-from netsentinel.wifi_manager import WifiError, WifiNetwork
+from netspectre.__main__ import build_parser, run
+from netspectre.discovery.scan import KesifRaporu
+from netspectre.models import NetworkInfo, ScanResult
+from netspectre.permissions import PermissionStatus
+from netspectre.wifi_manager import WifiError, WifiNetwork
 
 ROOT_YETKI = PermissionStatus(is_root=True, has_net_raw=True, has_net_admin=True)
 PASIF_YETKI = PermissionStatus(is_root=False, has_net_raw=False, has_net_admin=False)
@@ -128,7 +128,7 @@ class TestRun:
         )
         # yetkisiz kullanıcı + pasif mod → hata değil (aktif tarama yok)
         assert kod == 0
-        assert "mod=passive" in capsys.readouterr().out
+        assert "mode=passive" in capsys.readouterr().out
 
     def test_pasif_mod_yetki_yarisi_yazmaz(self, cfg_dosyasi, capsys):
         mgr = SahteMgr()
@@ -140,7 +140,7 @@ class TestRun:
         )
         assert kod == 0
         cikan = capsys.readouterr()
-        assert "mod=passive" in cikan.out
+        assert "mode=passive" in cikan.out
         assert "Yetersiz yetki" not in cikan.err + cikan.out
 
     def test_aktif_mod_yetkisiz_kullanici_1_doner(self, cfg_dosyasi, capsys):
@@ -189,7 +189,7 @@ class TestRun:
         assert "menzil yok" in capsys.readouterr().err
 
     def test_rate_bayragi_yapilandirmayi_kilar(self, cfg_dosyasi, monkeypatch):
-        from netsentinel import __main__ as giris
+        from netspectre import __main__ as giris
 
         gorulen: dict = {}
         mgr = SahteMgr()
@@ -208,7 +208,7 @@ class TestRun:
         assert gorulen["rate"] == 7  # config'deki 40 yerine bayrak değeri
 
     def test_tui_bayragi_uygulamayi_kurur_ve_calistirir(self, cfg_dosyasi, capsys):
-        from netsentinel.ui.app import NetSentinelApp
+        from netspectre.ui.app import NetSpectreApp
 
         mgr = SahteMgr()
         gorulen: dict = {}
@@ -225,9 +225,9 @@ class TestRun:
             tui_fn=sahte_tui,
         )
         assert kod == 0
-        assert "TUI açılıyor" in capsys.readouterr().out
+        assert "Opening the TUI" in capsys.readouterr().out
         app = gorulen["app"]
-        assert isinstance(app, NetSentinelApp)
+        assert isinstance(app, NetSpectreApp)
         assert app._aktif_ssid == "EvAg_5G"
 
     def test_tui_yetkisizse_pasif_moda_duser_hata_vermez(self, cfg_dosyasi, capsys):
@@ -248,12 +248,12 @@ class TestRun:
         assert kod == 0
         assert seen.get("ok") is True
         cikan = capsys.readouterr()
-        assert "PASİF modda" in cikan.err
-        assert "mod=passive" in cikan.out
+        assert "PASSIVE mode" in cikan.err
+        assert "mode=passive" in cikan.out
 
 
 def iki_cihazli_kesif(network, scan_cfg, **kwargs):
-    from netsentinel.models import Device, ScanResult
+    from netspectre.models import Device, ScanResult
 
     r = ScanResult(network=network)
     r.add_device(
@@ -263,7 +263,7 @@ def iki_cihazli_kesif(network, scan_cfg, **kwargs):
             open_ports=[554, 8000],
             device_type="camera",
             risk_score=100,
-            risk_reasons=["RTSP portu açık (video akışı)"],
+            risk_reasons=["RTSP port open (video stream)"],
         )
     )
     r.add_device(Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="laptop"))
@@ -290,8 +290,8 @@ class TestRaporAkisi:
             kesif_fn=iki_cihazli_kesif,
         )
         assert kod == 0
-        assert "Rapor yazıldı" in capsys.readouterr().out
-        assert len(list(dizin.glob("netsentinel-*.json"))) == 1
+        assert "Report written" in capsys.readouterr().out
+        assert len(list(dizin.glob("netspectre-*.json"))) == 1
 
     def test_export_anonim_kimlikleri_gizler(self, tmp_path):
         cfg, dizin = self._cfg_dizin(tmp_path)
@@ -301,13 +301,13 @@ class TestRaporAkisi:
             permission_status=ROOT_YETKI,
             kesif_fn=iki_cihazli_kesif,
         )
-        icerik = next(iter(dizin.glob("netsentinel-*.json"))).read_text(encoding="utf-8")
+        icerik = next(iter(dizin.glob("netspectre-*.json"))).read_text(encoding="utf-8")
         assert "0C:75:D2:AA:BB:CC" not in icerik
         assert "MAC-" in icerik
 
     def test_onceki_rapora_gore_yeni_cihaz_uyarisi(self, tmp_path, capsys):
-        from netsentinel import report
-        from netsentinel.models import Device, ScanResult
+        from netspectre import report
+        from netspectre.models import Device, ScanResult
 
         cfg, dizin = self._cfg_dizin(tmp_path)
         dizin.mkdir(parents=True)
@@ -323,9 +323,9 @@ class TestRaporAkisi:
         )
         out = capsys.readouterr().out
         assert kod == 0
-        assert "YENİ cihaz" in out
+        assert "NEW devices" in out
         assert "0C:75:D2:AA:BB:CC" in out  # kamera yeni
-        assert "11:AA:22:BB:33:CC" not in out.split("YENİ")[1]  # laptop yeni değil
+        assert "11:AA:22:BB:33:CC" not in out.split("NEW devices")[1]  # laptop yeni değil
 
 
 class TestCokluAkis:
@@ -341,11 +341,11 @@ class TestCokluAkis:
         )
         out = capsys.readouterr().out
         assert kod == 0
-        assert "Ağ: EvAg_5G" in out
-        assert "Atlanan ağlar" in out
+        assert "Network: EvAg_5G" in out
+        assert "Skipped networks" in out
         assert "Komsu_2.4" in out  # profili yok → atlanan
         assert "kayıtlı NetworkManager profili yok" in out
-        assert "✅ 1 ağ tarandı" in out
+        assert "1 networks scanned" in out
 
     def test_tui_tum_aglar_modunda_kurulur(self):
         gorulen: dict = {}
@@ -424,13 +424,13 @@ class TestSudoYenidenBaslatma:
     """Yetki yoksa aracı sudo ile kendimiz yeniden başlatma (üretim yolu)."""
 
     def test_cevre_kalkani_devre_dısina_alar(self, monkeypatch):
-        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+        from netspectre.__main__ import _SU_YOK, _sudo_komutu
 
         monkeypatch.setenv(_SU_YOK, "1")
         assert _sudo_komutu(["--no-connect"]) is None
 
     def test_root_kullanicida_none(self, monkeypatch):
-        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+        from netspectre.__main__ import _SU_YOK, _sudo_komutu
 
         monkeypatch.delenv(_SU_YOK, raising=False)
         monkeypatch.setattr(os, "geteuid", lambda: 0)
@@ -439,20 +439,20 @@ class TestSudoYenidenBaslatma:
         assert _sudo_komutu([]) is None
 
     def test_komut_uretimi_sys_python(self, monkeypatch):
-        from netsentinel.__main__ import _SU_YOK, _sudo_komutu
+        from netspectre.__main__ import _SU_YOK, _sudo_komutu
 
         monkeypatch.delenv(_SU_YOK, raising=False)
         monkeypatch.setattr(os, "geteuid", lambda: 1000)
         monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
         monkeypatch.setattr(shutil, "which", lambda p: f"/usr/bin/{p}")
         komut = _sudo_komutu(["--no-connect", "--passive"])
-        assert komut[:4] == ["sudo", sys.executable, "-m", "netsentinel"]
+        assert komut[:4] == ["sudo", sys.executable, "-m", "netspectre"]
         assert komut[4:] == ["--no-connect", "--passive"]
 
     def test_active_yetkisizse_sudo_ile_yeniden_baslatilir(self, tmp_path, capsys, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        from netsentinel import __main__ as ns_main
-        from netsentinel.__main__ import _SU_YOK
+        from netspectre import __main__ as ns_main
+        from netspectre.__main__ import _SU_YOK
 
         monkeypatch.delenv(_SU_YOK, raising=False)
         monkeypatch.setattr(os, "geteuid", lambda: 1000)
@@ -468,11 +468,11 @@ class TestSudoYenidenBaslatma:
 
         assert kod == 0
         assert gorulen.get("prog") == "sudo"
-        assert "sudo ile yeniden başlatılıyor" in capsys.readouterr().out
+        assert "restarting with sudo" in capsys.readouterr().out
 
     def test_tty_yoksa_sudo_istenmez_hata_donmesi(self, tmp_path, capsys, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        from netsentinel.__main__ import _SU_YOK
+        from netspectre.__main__ import _SU_YOK
 
         monkeypatch.delenv(_SU_YOK, raising=False)
         monkeypatch.setattr(os, "geteuid", lambda: 1000)
@@ -485,7 +485,7 @@ class TestSudoYenidenBaslatma:
 
 
 def test_main_net_spectre_argsiz_tui_ve_hepsi_baslatir(monkeypatch):
-    from netsentinel import __main__ as giris
+    from netspectre import __main__ as giris
 
     gorulen: list[list[str] | None] = []
 
@@ -504,7 +504,7 @@ def test_main_net_spectre_argsiz_tui_ve_hepsi_baslatir(monkeypatch):
 
 
 def test_main_net_spectre_argumanlarda_oldigi_gibi_gecer(monkeypatch):
-    from netsentinel import __main__ as giris
+    from netspectre import __main__ as giris
 
     gorulen: list[list[str] | None] = []
 

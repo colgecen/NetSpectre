@@ -1,7 +1,7 @@
-"""scoring.py puan tablosu + beyaz liste testleri (detection.md §2)."""
+"""scoring.py puan tablosu + beyaz liste testleri."""
 
-from netsentinel.analyzer.fingerprint import ImzaKumesi, sinyalleri_cikar
-from netsentinel.analyzer.scoring import (
+from netspectre.analyzer.fingerprint import ImzaKumesi, sinyalleri_cikar
+from netspectre.analyzer.scoring import (
     KESIN_KAMERA_TABANI,
     MAKS_PUAN,
     beyaz_liste_uygula,
@@ -9,7 +9,7 @@ from netsentinel.analyzer.scoring import (
     puan_hesapla,
     sonuc_analiz,
 )
-from netsentinel.models import Device, NetworkInfo, RiskLevel, ScanResult
+from netspectre.models import Device, NetworkInfo, RiskLevel, ScanResult
 
 IMZALAR = ImzaKumesi.varsayilan()
 
@@ -27,9 +27,9 @@ def test_belirgin_kamera_yuz_puan_ve_gerekceler():
     assert cihaz.risk_score == MAKS_PUAN
     assert cihaz.risk_level is RiskLevel.RED
     assert cihaz.device_type == "camera"
-    assert any("kamera odaklı" in g for g in cihaz.risk_reasons)
-    assert any("RTSP portu" in g for g in cihaz.risk_reasons)
-    assert any("DNVRS" in g or "Banner" in g for g in cihaz.risk_reasons)
+    assert any("Camera-focused" in g for g in cihaz.risk_reasons)
+    assert any("RTSP port open" in g for g in cihaz.risk_reasons)
+    assert any("DNVRS" in g or "banner" in g for g in cihaz.risk_reasons)
 
 
 def test_rtsp_arti_kamera_ureticisi_taban_85():
@@ -39,7 +39,7 @@ def test_rtsp_arti_kamera_ureticisi_taban_85():
     )
     sonuc = puan_hesapla(sinyalar, vendor="Dahua Technology")
     assert sonuc.puan == KESIN_KAMERA_TABANI
-    assert any("neredeyse kesin" in g for g in sonuc.gerekceler)
+    assert any("almost certainly" in g for g in sonuc.gerekceler)
 
 
 def test_beyaz_liste_puan_sifirlar():
@@ -53,18 +53,18 @@ def test_beyaz_liste_puan_sifirlar():
     cihaz_analiz(cihaz, IMZALAR)
     assert cihaz.risk_score == 0
     assert cihaz.risk_level is RiskLevel.GREEN
-    assert any("Beyaz liste" in g for g in cihaz.risk_reasons)
+    assert any("Whitelisted" in g for g in cihaz.risk_reasons)
 
 
 def test_beyaz_liste_mac_etiketi_tur_olur():
     cihazlar = [
-        Device(ip="192.168.1.20", mac="aa-bb-cc-11-22-33", hostname="mahmut-phone"),
+        Device(ip="192.168.1.20", mac="aa-bb-cc-11-22-33", hostname="demo-phone"),
         Device(ip="192.168.1.21", mac="DD:EE:FF:44:55:66"),
     ]
-    adet = beyaz_liste_uygula(cihazlar, {"AA:BB:CC:11:22:33": "Benim telefonum"})
+    adet = beyaz_liste_uygula(cihazlar, {"AA:BB:CC:11:22:33": "My phone"})
     assert adet == 1
     assert cihazlar[0].trusted
-    assert cihazlar[0].device_type == "Benim telefonum"
+    assert cihazlar[0].device_type == "My phone"
     assert not cihazlar[1].trusted
 
 
@@ -74,7 +74,7 @@ def test_yalnizca_web_port_zayif_sinyal():
     )
     cihaz_analiz(cihaz, IMZALAR, gateway_ip="192.168.1.1")
     assert cihaz.risk_score == 5
-    assert any("yalnızca web" in g.lower() for g in cihaz.risk_reasons)
+    assert any("only web" in g.lower() for g in cihaz.risk_reasons)
 
 
 def test_kimlik_yok_arti_rastgele_mac():
@@ -142,11 +142,11 @@ def test_sonuc_analiz_butun_cihazlari_puanlar():
                 vendor="Hikvision",
                 open_ports=[554],
             ),
-            Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="benim-laptop"),
+            Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="laptop"),
         ],
     )
     sonuc_analiz(
-        sonuc, IMZALAR, whitelist={"11:AA:22:BB:33:CC": "Benim laptop"}, gateway_ip="192.168.1.1"
+        sonuc, IMZALAR, whitelist={"11:AA:22:BB:33:CC": "My laptop"}, gateway_ip="192.168.1.1"
     )
     kamera = sonuc.find_by_mac("0C:75:D2:77:88:99")
     laptop = sonuc.find_by_mac("11:AA:22:BB:33:CC")

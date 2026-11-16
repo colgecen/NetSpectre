@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from netsentinel.config import AppConfig, ConfigError, check_file_permissions, load_config
+from netspectre.config import AppConfig, ConfigError, check_file_permissions, load_config
 
 CONFIG_ORNEGI = """
 wifi:

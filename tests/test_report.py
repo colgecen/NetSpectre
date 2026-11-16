@@ -2,8 +2,8 @@
 
 import json
 
-from netsentinel import report
-from netsentinel.models import Device, NetworkInfo, ScanResult
+from netspectre import report
+from netspectre.models import Device, NetworkInfo, ScanResult
 
 
 def _sonuc() -> ScanResult:
@@ -23,7 +23,7 @@ def _sonuc() -> ScanResult:
             open_ports=[554, 8000],
             device_type="camera",
             risk_score=100,
-            risk_reasons=["RTSP portu açık (video akışı)", "Üretici kamera odaklı: Hikvision"],
+            risk_reasons=["RTSP port open (video stream)", "Camera-focused vendor: Hikvision"],
         )
     )
     r.add_device(Device(ip="192.168.1.5", mac="11:AA:22:BB:33:CC", hostname="laptop", trusted=True))
@@ -32,7 +32,7 @@ def _sonuc() -> ScanResult:
 
 def test_json_gecerli_ve_anlasilir():
     veri = json.loads(report.json_metni(_sonuc()))
-    assert veri["araç"] == "NetSentinel"
+    assert veri["araç"] == "NetSpectre"
     assert veri["ssid"] == "EvAg_5G"
     assert veri["özet"]["total"] == 2
     assert veri["özet"]["suspicious"] == 1
@@ -56,11 +56,11 @@ def test_maske_deterministik():
 
 def test_markdown_baslik_tablo_ve_supheli():
     md = report.markdown_metni(_sonuc())
-    assert "# 🛰️ NetSentinel" in md
+    assert "# 🛰️ NetSpectre" in md
     assert "| Seviye | Puan | IP | MAC | Tür" in md
     assert "0C:75:D2:AA:BB:CC" in md
     assert "Şüpheli Cihazlar" in md
-    assert "RTSP portu açık" in md
+    assert "RTSP port open" in md
     assert "🔴" in md
 
 
@@ -76,7 +76,7 @@ def test_yaz_dosyaya_json_ve_md(tmp_path):
     assert yol_j.exists() and yol_j.suffix == ".json"
     assert yol_m.exists() and yol_m.suffix == ".md"
     json.loads(yol_j.read_text(encoding="utf-8"))
-    assert "NetSentinel" in yol_m.read_text(encoding="utf-8")
+    assert "NetSpectre" in yol_m.read_text(encoding="utf-8")
 
 
 def test_yaz_yok_dizini_olusturur(tmp_path):
@@ -124,7 +124,7 @@ class TestCokluRapor:
 
     @staticmethod
     def _coklu():
-        from netsentinel.multiscan import AgSonucu, CokluSonuc
+        from netspectre.multiscan import AgSonucu, CokluSonuc
 
         sonuc1 = ScanResult(
             network=NetworkInfo(

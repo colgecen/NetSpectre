@@ -1,15 +1,15 @@
-"""fingerprint + camera_signatures.yaml testleri (detection.md §1/§3)."""
+"""fingerprint + camera_signatures.yaml testleri."""
 
 import pytest
 
-from netsentinel.analyzer.fingerprint import (
+from netspectre.analyzer.fingerprint import (
     VARSAYILAN_IMZA_YOLU,
     ImzaKumesi,
     mdns_sinifi,
     sinyalleri_cikar,
     tur_tahmini,
 )
-from netsentinel.models import Device, DeviceType
+from netspectre.models import Device, DeviceType
 
 
 @pytest.fixture(scope="module")

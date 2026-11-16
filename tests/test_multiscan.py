@@ -1,10 +1,10 @@
 """multiscan — çok ağlı tarama testleri (sahte WifiManager arayüzüyle)."""
 
-from netsentinel.config import AppConfig
-from netsentinel.discovery.scan import KesifRaporu
-from netsentinel.models import Device, NetworkInfo, ScanResult
-from netsentinel.multiscan import CokluSonuc, hedefleri_sec, tum_aglari_tara
-from netsentinel.wifi_manager import WifiNetwork
+from netspectre.config import AppConfig
+from netspectre.discovery.scan import KesifRaporu
+from netspectre.models import Device, NetworkInfo, ScanResult
+from netspectre.multiscan import CokluSonuc, hedefleri_sec, tum_aglari_tara
+from netspectre.wifi_manager import WifiNetwork
 
 
 def ag(ssid: str, signal: int = 70) -> WifiNetwork:

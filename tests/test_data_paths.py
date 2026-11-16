@@ -1,7 +1,7 @@
 """data_paths.data_dizini() çözümleme testleri (depo / teker / PyInstaller)."""
 
-from netsentinel import data_paths
-from netsentinel.data_paths import VERI_DİZİNİ_ÇEVRE, data_dizini
+from netspectre import data_paths
+from netspectre.data_paths import VERI_DİZİNİ_ÇEVRE, data_dizini
 
 
 def test_varsayilan_paket_veri_dizini_gercek_dosyalari_icerir():

@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from netsentinel.analyzer.ports import (
+from netspectre.analyzer.ports import (
     AnalyzerError,
     banner_topla,
     http_banner,

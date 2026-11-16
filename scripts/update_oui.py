@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """IEEE OUI listesini indirip ``data/oui.json`` yerel veritabanına çevirir.
 
-Uygulama çalışma zamanında internete çıkmaz (gizlilik — bkz. security.md);
+Uygulama çalışma zamanında internete çıkmaz (privacy);
 bu betik yalnızca bakım sırasında elle çalıştırılır:
 
     python scripts/update_oui.py                 # IEEE sitesinden indir
@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 IEEE_URL = "https://standards-oui.ieee.org/oui/oui.txt"
-VARSAYILAN_CIKTI = Path(__file__).resolve().parents[1] / "src" / "netsentinel" / "data" / "oui.json"
+VARSAYILAN_CIKTI = Path(__file__).resolve().parents[1] / "src" / "netspectre" / "data" / "oui.json"
 
 # Satır biçimi: 'AA-AA-AA   (hex)\t\tÜretici Adı'
 _OUI_SATIRI = re.compile(

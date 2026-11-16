@@ -2,7 +2,7 @@
 
 import pytest
 
-from netsentinel.permissions import (
+from netspectre.permissions import (
     PermissionStatus,
     check_permissions,
     ensure_scan_permissions,
@@ -57,7 +57,7 @@ class TestCheckPermissions:
     def test_setcap_li_kullanici_tam_yetkili(self):
         st = check_permissions(geteuid=lambda: 1000, cap_reader=lambda: CAPS_ALL)
         assert st.can_scan
-        assert st.mode_label == "yetkili (setcap)"
+        assert st.mode_label == "privileged (setcap)"
         assert st.warnings == []
 
     def test_yetkisiz_kullanici_aktif_tarama_yapamaz_uyarir(self):
@@ -71,7 +71,7 @@ class TestCheckPermissions:
         assert len(st.warnings) == 1
         assert "setcap" in st.warnings[0]
         assert "/x/.venv/bin/python" in st.warnings[0]
-        assert st.mode_label == "sınırlı (yalnızca pasif)"
+        assert st.mode_label == "limited (passive only)"
 
     def test_yalniz_root_olmadan_kismi_yetenek_pasif_icin_yeter(self):
         st = check_permissions(geteuid=lambda: 1000, cap_reader=lambda: CAPS_YALNIZ_RAW)

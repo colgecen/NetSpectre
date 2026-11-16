@@ -1,27 +1,27 @@
-# NetSentinel yapılandırma şablonu
-# Kopyalayın: cp config.example.yaml config.yaml && chmod 600 config.yaml
+# NetSpectre configuration template
+# Copy it: cp config.example.yaml config.yaml && chmod 600 config.yaml
 #
-# ⚠️ Wi-Fi ŞİFRESİ YAZMAYIN! Yalnızca daha önce nmcli ile bağlanıp profil
-#    oluşturduğunuz SSID adlarını yazın (bkz. security.md).
+# Never write a Wi-Fi password here. Only list SSIDs that already have a
+# NetworkManager profile created with nmcli.
 
 wifi:
-  preferred:            # sırayla denenir; şifre YAZILMAZ, NetworkManager profili kullanılır
-    - "EvAg_5G"
-    - "EvAg_2.4G"
-  connect_timeout: 30   # saniye
+  preferred:            # tried in order; passwords are never stored, NetworkManager profiles are used
+    - "HomeNet_5G"
+    - "HomeNet_2.4G"
+  connect_timeout: 30   # seconds
 
 scan:
   mode: active          # active | passive
   ports: [80, 443, 554, 8080, 8554, 8000, 37777]
-  rate_limit: 50        # saniyedeki paket (router'ı yormamak için yüksek değerlerden kaçının)
-  host_timeout: 5       # tek cihaz için maksimum analiz süresi (saniye)
+  rate_limit: 50        # packets per second (avoid high values that stress weak routers)
+  host_timeout: 5       # maximum analysis time per device (seconds)
 
-whitelist:              # kendi cihazlarınız: MAC büyük-küçük harf/farklı ayraç tolere edilir
+whitelist:              # your own devices; MAC case and separators are normalized
   - mac: "AA:BB:CC:11:22:33"
     label: "Router"
   - mac: "DD:EE:FF:44:55:66"
-    label: "Telefonum"
+    label: "My phone"
 
 output:
   directory: "./reports"
-  anonymize: false      # true ise raporlarda IP/MAC son oktetleri maskelenir
+  anonymize: false      # true masks IP/MAC suffixes in reports

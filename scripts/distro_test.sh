@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NetSentinel dağıtım duman testi: Ubuntu, Debian, Arch, Kali.
+# NetSpectre dağıtım duman testi: Ubuntu, Debian, Arch, Kali.
 # Repoyu /src olarak monte edilmiş bir konteynerde çalıştırır; paketleri
 # kurar, editable kurulum yapar ve test paketini (root/ağ gerektirmeyen)
 # çalıştırır. Amaç: kodun dağıtımlar arası taşınabilir olduğunu doğrulamak.
@@ -43,12 +43,12 @@ $PY -m venv /tmp/ns-venv 2>/dev/null || {
 }
 /tmp/ns-venv/bin/python -m pip install --upgrade pip -q
 
-echo "==> NetSentinel editable kuruluyor (dev extras)"
+echo "==> NetSpectre editable kuruluyor (dev extras)"
 /tmp/ns-venv/bin/pip install -e ".[dev]" -q
 
 echo "==> Sürüm ve yardım"
-/tmp/ns-venv/bin/python -m netsentinel --version
-/tmp/ns-venv/bin/netsentinel --help >/dev/null && echo "  yardir: OK"
+/tmp/ns-venv/bin/python -m netspectre --version
+/tmp/ns-venv/bin/net-spectre --help >/dev/null && echo "  yardir: OK"
 
 echo "==> Test paketi"
 /tmp/ns-venv/bin/pytest -q

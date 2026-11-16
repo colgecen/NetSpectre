@@ -1,6 +1,6 @@
 """SSDP ayrıştırma testleri — gerçek soket gerekmez."""
 
-from netsentinel.discovery.ssdp import dinle, msearch_paketi, parse_ssdp
+from netspectre.discovery.ssdp import dinle, msearch_paketi, parse_ssdp
 
 NOTIFY_MEDIA = (
     b"NOTIFY * HTTP/1.1\r\n"

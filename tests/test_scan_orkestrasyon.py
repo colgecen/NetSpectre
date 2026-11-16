@@ -1,9 +1,9 @@
 """discovery/scan orkestrasyon testleri — üç kaynak da sahte işlevlerle."""
 
-from netsentinel.config import ScanConfig
-from netsentinel.discovery import Hint
-from netsentinel.discovery.scan import kesfet
-from netsentinel.models import NetworkInfo
+from netspectre.config import ScanConfig
+from netspectre.discovery import Hint
+from netspectre.discovery.scan import kesfet
+from netspectre.models import NetworkInfo
 
 AG = NetworkInfo(ssid="Ev", iface="wlan0", gateway="192.168.1.1", cidr="192.168.1.0/29")
 CFG = ScanConfig()

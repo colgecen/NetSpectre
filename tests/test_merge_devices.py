@@ -1,6 +1,6 @@
 """merge_devices birim testleri."""
 
-from netsentinel.discovery import Hint, dedupe_devices, hints_from_arp, merge_devices
+from netspectre.discovery import Hint, dedupe_devices, hints_from_arp, merge_devices
 
 
 def test_arp_ip_mac_cihazi():

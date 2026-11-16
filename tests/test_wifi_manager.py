@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import pytest
 
-from netsentinel.wifi_manager import (
+from netspectre.wifi_manager import (
     WifiError,
     WifiManager,
     WifiNetwork,
@@ -289,8 +289,8 @@ def test_saved_profiles_sadece_kablosuz_hatalar_baslaniyor():
 
 
 def test_baglanti_oturdu_ip_gelene_kadar_sinirli_bekler(monkeypatch):
-    from netsentinel import wifi_manager as wm
-    from netsentinel.models import NetworkInfo
+    from netspectre import wifi_manager as wm
+    from netspectre.models import NetworkInfo
 
     bekleyen: list[int] = []
 

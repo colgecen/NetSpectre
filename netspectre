@@ -1,25 +1,42 @@
 #!/usr/bin/env bash
 #
-# netspectre — NetSentinel paketleme aracı (Python / PyInstaller)
+# netspectre - run and build tool (standard launcher for every project)
 #
-# Kullanim:
-#   ./netspectre                     -> interaktif menü (format sec -> derle)
-#   ./netspectre linux appimage      -> direkt AppImage derle
-#   ./netspectre linux targz         -> tar.gz dağıtım paketi
-#   ./netspectre linux binary        -> PyInstaller onedir çıktısı
-#   ./netspectre --install           -> iki komut kur (~/.local/bin):
-#                                        'netspectre'  = bu paketleme menusu
-#                                        'net-spectre' = uygulama (argsiz TUI)
-#   ./netspectre --list              -> hedefleri listele
-#   ./netspectre --help              -> yardim
+# Behaviour:
+#   ./netspectre                  Run the app from source (unbuilt). Stop it with Ctrl+C.
+#   netspectre                    Open the build menu (after one-time --install, no "./" needed).
 #
-# Not: Python projelerinde Windows/macOS'a çapraz derleme güvenilir değildir;
-#      hedef yalnızca Linux'tur (AppImage her dağıtımda çalışır).
+# Commands (reserved flags; every other argument is passed to the app):
+#   ./netspectre --install        Install the `netspectre` command into ~/.local/bin
+#                                  and register the app (icon + launcher entry) as a system app
+#   ./netspectre --uninstall      Remove that command, the launcher entry and the icon
+#   ./netspectre --build          Interactive build menu
+#   ./netspectre --build <os> <format> [arch]
+#   ./netspectre --build --list   List all build targets
+#
+# Targets:
+#   linux   : appimage | targz | rpm | source | binary | all
+#   windows : not supported by this project
+#   arch    : x86_64 | aarch64 | all          (default: all)
+#
+# Assets are written to build/dist/ as <project>-<version>-<os>-<arch>.<ext>
+# and a SHA256SUMS file is generated next to them.
 #
 set -euo pipefail
 
-VERSION="${VERSION:-0.1.0}"
+# ---- per-project settings (the only part that changes between projects) ----
+APP="netspectre"                  # lowercase command name
+BIN="netspectre"                  # name of the built binary
+MODULE="netspectre"               # Python module executed from source
+SUMMARY="Find hidden cameras and unknown IoT devices on your Wi-Fi network"
+LICENSE_ID="MIT"                  # SPDX identifier, must match the LICENSE file
+WINDOWS_SUPPORTED="no"            # "no" -> Linux-only releases
+ICON="assets/icon.png"            # optional; skipped when the file is missing
+ICON_RADIUS_PCT="20"              # corner radius as % of icon size (square icons get rounded)
+VERSION="${VERSION:-0.1.0}"       # override: VERSION=1.2.0 netspectre ...
+ARCHS_DEFAULT="x86_64 aarch64"
 
+# ---- locate the repository root (resolves symlinks) ----
 resolve_root() {
   local src="${BASH_SOURCE[0]}"
   while [ -L "$src" ]; do
@@ -31,405 +48,520 @@ resolve_root() {
   cd -P "$(dirname "$src")" && pwd
 }
 ROOT="$(resolve_root)"
+DIST="$ROOT/build/dist"
+STAGE="$ROOT/build/.stage"
+CACHE="$ROOT/build/.cache"
 
-banner() {
-  echo "=============================================="
-  echo "  NetSentinel — netspectre paketleme araci  v$VERSION"
-  echo "=============================================="
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+find_python() {
+  PY="$ROOT/.venv/bin/python"
+  if [ ! -x "$PY" ]; then
+    local base
+    base="$(command -v python3 2>/dev/null || true)"
+    [ -n "$base" ] || die "Python 3 not found. Install Python 3.10 or newer first."
+    echo "==> Creating .venv and installing dependencies (one-time)..." >&2
+    "$base" -m venv "$ROOT/.venv"
+    "$ROOT/.venv/bin/pip" install --quiet --upgrade pip
+    "$ROOT/.venv/bin/pip" install --quiet -e "$ROOT"
+  fi
+  if ! "$PY" -c "import $MODULE, textual, scapy" >/dev/null 2>&1; then
+    echo "==> Installing project dependencies..." >&2
+    "$ROOT/.venv/bin/pip" install --quiet -e "$ROOT"
+  fi
 }
 
-usage() {
-  banner
-  echo
-  echo "Kullanim:"
-  echo "  ./netspectre                 Interaktif menü"
-  echo "  ./netspectre linux <format>  Direkt derle"
-  echo "  ./netspectre --yetki        Derlenen ikiliye ARP yetkisi ver (sudo şifre sorar)"
-  echo "  ./netspectre --install      'netspectre' (menu) + 'net-spectre' (uygulama) kur"
-  echo "  ./netspectre --list         Hedefleri listele"
-  echo "  ./netspectre --help          Bu yardim"
-  echo
-  echo "Hedefler (yalniz Linux):"
-  echo "  appimage (.AppImage, tüm dağıtımlar) | targz (.tar.gz) | binary (onedir dizini)"
-  echo
-  echo "Ornekler:"
-  echo "  ./netspectre linux appimage"
-  echo "  VERSION=1.0.0 ./netspectre linux targz"
+ensure_build_env() {
+  find_python
+  if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
+    echo "==> Installing PyInstaller..." >&2
+    "$ROOT/.venv/bin/pip" install --quiet "pyinstaller>=6.6"
+  fi
 }
 
-list_targets() {
-  echo "linux   : appimage (.AppImage) | targz (.tar.gz) | binary (onedir dizini)"
-  echo "windows : desteklenmiyor (Python capraz derleme guvenilir degil)"
-  echo "macos   : desteklenmiyor"
+# =====================================================================
+# Run mode: start the unbuilt app straight from source
+# =====================================================================
+run_app() {
+  find_python
+  cd "$ROOT"
+  # With no arguments open the TUI over all saved networks; otherwise pass
+  # every argument straight to the app.
+  if [ $# -eq 0 ]; then
+    set -- --tui --hepsi
+  fi
+  exec "$PY" -m "$MODULE" "$@"
 }
 
-python_bin() {
-  if [ -x "$ROOT/.venv/bin/python" ]; then
-    echo "$ROOT/.venv/bin/python"
+# =====================================================================
+# Install / uninstall the bare `netspectre` command
+# =====================================================================
+WRAPPER_MARK="# netspectre-wrapper"
+DESKTOP_MARK="# netspectre-desktop"
+
+# prepare_icon <dest>: write the icon to <dest>, rounding square corners (needs ImageMagick).
+prepare_icon() {
+  local src="$ROOT/$ICON" dest="$1" im="" w r corner
+  [ -f "$src" ] || return 1
+  if command -v magick >/dev/null 2>&1; then im="magick"
+  elif command -v convert >/dev/null 2>&1; then im="convert"; fi
+  if [ -z "$im" ]; then
+    echo "NOTE: ImageMagick not found, icon copied without rounding."
+    cp "$src" "$dest"; return 0
+  fi
+  if [ "$im" = "magick" ]; then
+    w="$($im identify -format '%w' "$src")"
+    # Is the top-left pixel already transparent? Then the icon is already rounded.
+    corner="$($im identify -format '%[fx:p{0,0}.a]' "$src" 2>/dev/null || echo 1)"
   else
-    command -v python3
+    w="$($im "$src" -format %w info:)"
+    corner="$($im "$src" -alpha extract -format '%[fx:p{0,0}.r]' info: 2>/dev/null || echo 1)"
+  fi
+  [ -n "$w" ] || { cp "$src" "$dest"; return 0; }
+  r=$(( w * ICON_RADIUS_PCT / 100 ))
+  if [ "$corner" = "0" ]; then
+    cp "$src" "$dest"
+  else
+    $im "$src" -alpha set \
+      \( -size "${w}x${w}" xc:none -fill white \
+         -draw "roundrectangle 0,0 $((w-1)),$((w-1)) $r,$r" \) \
+      -compose DstIn -composite "$dest"
+  fi
+}
+
+install_desktop_entry() {
+  local apps="$HOME/.local/share/applications"
+  local icons="$HOME/.local/share/icons/hicolor/512x512/apps"
+  local iconline=""
+  mkdir -p "$apps" "$icons"
+  if prepare_icon "$icons/$APP.png"; then iconline="Icon=$APP"; fi
+  cat > "$apps/$APP.desktop" << DESKTOP
+$DESKTOP_MARK
+[Desktop Entry]
+Type=Application
+Name=$APP
+Comment=$SUMMARY
+Exec="$ROOT/$APP"
+$iconline
+Terminal=true
+Categories=Utility;
+DESKTOP
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$apps" 2>/dev/null || true
+  command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+  echo "Installed: $apps/$APP.desktop (appears in the application launcher)"
+}
+
+uninstall_desktop_entry() {
+  local f="$HOME/.local/share/applications/$APP.desktop"
+  if [ -f "$f" ] && grep -q "$DESKTOP_MARK" "$f"; then
+    rm -f "$f" "$HOME/.local/share/icons/hicolor/512x512/apps/$APP.png"
+    echo "Removed: $f"
   fi
 }
 
 do_install() {
   local bindir="$HOME/.local/bin"
+  find_python
   mkdir -p "$bindir"
-
-  # 1) netspectre  -> paketleme menüsü (bu betiğin kendisi)
-  ln -sf "$ROOT/netspectre" "$bindir/netspectre"
-  echo "Kuruldu: $bindir/netspectre  -> paketleme araci (menu)"
-
-  # 2) net-spectre -> uygulama (TUI). Argsiz calisirsa arayuzu acar.
-  local hedef=""
-  if [ -x "$ROOT/build/pyi/netspectre/netspectre" ]; then
-    hedef="$ROOT/build/pyi/netspectre/netspectre"
-  elif [ -x "$ROOT/.venv/bin/netsentinel" ]; then
-    hedef="$ROOT/.venv/bin/netsentinel"
-  else
-    echo "UYARI: uygulama ikilisi yok; once derle: ./netspectre linux binary"
-  fi
-  if [ -n "$hedef" ]; then
-    cat > "$bindir/net-spectre" << WRAP
-#!/usr/bin/env bash
-# NetSentinel uygulamasi — argsiz: terminal arayuzu (TUI).
-# Hata olursa yutulmasin: stderr log'a yazilir; yetki hatasiysa sudo ile
-# tekrar calistirmayi onerir (sifre istemi terminalde gorunur).
-BIN="$hedef"
-LOG="\${NETSPECTRE_LOG:-\$HOME/.local/state/netspectre.log}"
-mkdir -p "\$(dirname "\$LOG")" 2>/dev/null
-[ -n "\$TERM" ] || export TERM=xterm-256color
-if [ \$# -eq 0 ]; then
-  # Argsiz kullanimda hedeflenen akis "tüm kayitli aglari dolaş"tir.
-  # Tek ag görmek isteyen "net-spectre --tui --no-connect" kullanir.
-  set -- --tui --hepsi
-else
-  # 'tüm ağlar' isteniyorsa (nerede olursa olsun) arayüzde aç
-  TUM=0
-  for a in "\$@"; do
-    case "\$a" in
-      --hepsi|--all-networks) TUM=1 ;;
-    esac
-  done
-  [ "\$TUM" = "1" ] && set -- --tui "\$@"
-fi
-# TUI ekran cizimleri stderr'e gider; log'a yonlendirmek ekrani bos birakir.
-# Bu yuzden arayuz modunda stderr terminalde kalir, CLI modunda log'a yazilir.
-TUI_MOD=0
-PASIF_MOD=0
-for a in "\$@"; do
-  [ "\$a" = "--tui" ] && TUI_MOD=1
-  [ "\$a" = "--passive" ] && PASIF_MOD=1
-done
-# Aktif modda TUI acilacaksa ve ikilide ARP yetkisi yoksa sudo ile baslatmayi
-# oner. '--passive' ile acilis yetki istemez; setcap uygulanmissa da sormaz.
-if [ "\$TUI_MOD" = "1" ] && [ "\$PASIF_MOD" = "0" ] && [ "\$(id -u)" != "0" ]; then
-  if ! getcap -v -- "\$BIN" 2>/dev/null | grep -q cap_net_raw; then
-    echo "Tam tarama (ARP) icin sudo yetkisi gerekiyor."
-    read -r -p "sudo ile baslatayim mi? [E/h] " yanit
-    if [ "\$yanit" != "h" ] && [ "\$yanit" != "H" ]; then
-      exec sudo "\$BIN" "\$@"
-    fi
-    echo "Yetkisiz devam ediliyor — arayuz pasif modda acilacak."
-  fi
-fi
-if [ "\$TUI_MOD" = "1" ]; then
-  "\$BIN" "\$@"
-  kod=\$?
-else
-  "\$BIN" "\$@" 2>>"\$LOG"
-  kod=\$?
-fi
-if [ \$kod -ne 0 ]; then
-  echo "--- NetSentinel kod=\$kod ile kapandi; log: \$LOG (son 15 satir) ---"
-  tail -15 "\$LOG" 2>/dev/null
-  if grep -qiE "yetersiz yetki|setcap" "\$LOG" 2>/dev/null; then
-    read -r -p "Aktif tarama (ARP) icin sudo ile tekrar deneyeyim mi? [E/h] " yanit
-    if [ "\$yanit" != "h" ] && [ "\$yanit" != "H" ]; then
-      exec sudo "\$BIN" "\$@"
-    fi
-  fi
-  read -r -p "Kapatmak icin Enter'a bas..."
-fi
-WRAP
-    chmod +x "$bindir/net-spectre"
-    echo "Kuruldu: $bindir/net-spectre -> uygulama ($hedef)"
-  fi
-
+  printf '#!/usr/bin/env bash\n%s\nexec "%s/%s" --build "$@"\n' \
+    "$WRAPPER_MARK" "$ROOT" "$APP" > "$bindir/$APP"
+  chmod +x "$bindir/$APP"
+  install_desktop_entry
+  echo "Installed: $bindir/$APP"
   case ":$PATH:" in
-    *":$bindir:"*) echo "PATH tamam. Artik her klasorden: 'netspectre' (menu), 'net-spectre' (uygulama)." ;;
+    *":$bindir:"*) echo "Done. Type '$APP' in any folder to open the build menu." ;;
     *)
-      echo "NOT: '$bindir' PATH'te yok. Su satiri ~/.bashrc'ye ekle:"
-      echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-      echo "Sonra yeni terminal ac ya da: source ~/.bashrc"
+      echo "NOTE: $bindir is not in PATH. Add this line to ~/.bashrc:"
+      echo '  export PATH="$HOME/.local/bin:$PATH"'
+      echo "Then open a new terminal or run: source ~/.bashrc"
       ;;
   esac
 }
 
-# fetch_appimagetool / fetch_appimage_runtime — musicle derlemesinden uyarlandi:
-# PATH'te yoksa build/ altina indirir; runtime 503'lerine karsi onbellege alinir.
-fetch_appimagetool() {
-  local dest="$ROOT/build/appimagetool"
-  local url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
-
-  if command -v appimagetool >/dev/null 2>&1; then
-    APPIMAGETOOL="$(command -v appimagetool)"
-    return 0
+do_uninstall() {
+  local f="$HOME/.local/bin/$APP"
+  if [ -f "$f" ] && grep -q "$WRAPPER_MARK" "$f"; then
+    rm -f "$f"
+    echo "Removed: $f"
+  else
+    echo "Nothing to remove."
   fi
-  if [ -s "$dest" ]; then
-    APPIMAGETOOL="$dest"
-    chmod +x "$APPIMAGETOOL"
-    return 0
-  fi
+  uninstall_desktop_entry
+}
 
+# =====================================================================
+# Helpers
+# =====================================================================
+banner() {
+  echo "=============================================="
+  echo "  $APP build tool  v$VERSION"
+  echo "=============================================="
+}
+
+list_targets() {
+  echo "linux   : appimage | targz | rpm | source | binary | all"
+  echo "arch    : x86_64 | aarch64 | all (default)"
+}
+
+usage() {
+  banner
+  echo
+  echo "Usage:"
+  echo "  $APP                          Interactive build menu"
+  echo "  $APP <os> <format> [arch]     Build directly"
+  echo "  $APP --list                   List targets"
+  echo
+  list_targets
+}
+
+host_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo x86_64 ;;
+    aarch64|arm64) echo aarch64 ;;
+    *) die "Unsupported host architecture: $(uname -m)" ;;
+  esac
+}
+
+# Docker platform for cross-architecture builds (used when needed).
+docker_platform() {
+  case "$1" in
+    x86_64) echo linux/amd64 ;;
+    aarch64) echo linux/arm64 ;;
+    *) die "Unknown architecture: $1" ;;
+  esac
+}
+
+asset() { echo "$DIST/$APP-$VERSION-$1-$2.$3"; }
+
+fetch() { # fetch <url> <dest>
+  local url="$1" dest="$2"
+  [ -s "$dest" ] && return 0
   rm -f "$dest"
-  echo "==> appimagetool indiriliyor..."
   if command -v curl >/dev/null 2>&1; then
     curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 "$url" -o "$dest" || rm -f "$dest"
   fi
   if [ ! -s "$dest" ] && command -v wget >/dev/null 2>&1; then
     wget -O "$dest" "$url" || rm -f "$dest"
   fi
-  if [ ! -s "$dest" ]; then
-    echo "HATA: appimagetool indirilemedi. Internet baglantisini kontrol et"
-    echo "      ya da appimagetool'u PATH'e kurup tekrar dene."
-    exit 1
-  fi
+  [ -s "$dest" ] || die "Download failed: $url"
   chmod +x "$dest"
-  APPIMAGETOOL="$dest"
 }
 
-fetch_appimage_runtime() {
-  local dest="$ROOT/build/runtime-x86_64"
-  local url="https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"
-  APPIMAGE_RUNTIME=""
-
-  if [ -s "$dest" ]; then
-    APPIMAGE_RUNTIME="$dest"
-    return 0
+# =====================================================================
+# PyInstaller builds
+# =====================================================================
+pyi_local() { # pyi_local <mode: onedir|onefile> <outdir>
+  local mode="$1" outdir="$2" work="$STAGE/work-$(host_arch)" spec="$STAGE/spec-$(host_arch)"
+  rm -rf "$outdir" "$work" "$spec"
+  mkdir -p "$outdir" "$work" "$spec"
+  echo "==> PyInstaller ($mode, $(host_arch))"
+  "$PY" -m PyInstaller --noconfirm --clean "--$mode" --name "$BIN" \
+    --distpath "$outdir/dist" --workpath "$work" --specpath "$spec" \
+    --paths "$ROOT/src" \
+    --add-data "$ROOT/src/$MODULE/data:data" \
+    --collect-all scapy \
+    --copy-metadata "$MODULE" \
+    "$ROOT/packaging/entrypoint.py" >/dev/null
+  if [ "$mode" = "onedir" ]; then
+    cp -a "$outdir/dist/$BIN/." "$outdir/"
+  else
+    cp "$outdir/dist/$BIN" "$outdir/$BIN"
   fi
-
-  echo "==> AppImage runtime indiriliyor..."
-  rm -f "$dest"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 "$url" -o "$dest" || rm -f "$dest"
-  fi
-  if [ ! -s "$dest" ] && command -v wget >/dev/null 2>&1; then
-    wget -O "$dest" "$url" || rm -f "$dest"
-  fi
-  if [ ! -s "$dest" ]; then
-    echo "UYARI: AppImage runtime indirilemedi; appimagetool kendi deneyecek."
-    rm -f "$dest"
-    return 1
-  fi
-  chmod +x "$dest"
-  APPIMAGE_RUNTIME="$dest"
+  rm -rf "$outdir/dist"
 }
 
-ensure_pyinstaller() {
-  local PY
-  PY="$(python_bin)"
-  if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
-    echo "==> pyinstaller kuruluyor ($PY)..."
-    "$PY" -m pip install --quiet pyinstaller
+pyi_cross() { # pyi_cross <mode> <arch> <outdir>
+  local mode="$1" arch="$2" outdir="$3" engine platform cross
+  if command -v docker >/dev/null 2>&1; then engine="docker"
+  elif command -v podman >/dev/null 2>&1; then engine="podman"
+  else die "Cross-building $arch needs Docker or Podman, or run on a matching runner."
   fi
-  PYINSTALLER_PY="$PY"
+  platform="$(docker_platform "$arch")"
+  cross="$ROOT/build/.cross-$arch"
+  rm -rf "$outdir" "$cross"
+  mkdir -p "$outdir"
+  echo "==> PyInstaller ($mode, $arch via $engine)"
+  "$engine" run --rm --platform "$platform" \
+    -v "$ROOT:/src" -w /src \
+    -e HOME=/tmp -e PIP_CACHE_DIR=/tmp/pip \
+    --user "$(id -u):$(id -g)" \
+    python:3.12-bookworm bash -lc "
+      set -e
+      python -m pip install --quiet --user -e '.[packaging]'
+      python -m PyInstaller --noconfirm --clean --$mode --name $BIN \
+        --distpath build/.cross-$arch/dist \
+        --workpath build/.cross-$arch/work \
+        --specpath build/.cross-$arch/spec \
+        --paths src \
+        --add-data src/$MODULE/data:data \
+        --collect-all scapy \
+        --copy-metadata $MODULE \
+        packaging/entrypoint.py >/dev/null
+    "
+  if [ "$mode" = "onedir" ]; then
+    cp -a "$cross/dist/$BIN/." "$outdir/"
+  else
+    cp "$cross/dist/$BIN" "$outdir/$BIN"
+  fi
+  rm -rf "$cross"
 }
 
-pyi_build() {
-  mkdir -p "$ROOT/build"
-  ensure_pyinstaller
-  echo "==> PyInstaller onedir derlemesi (netspectre v$VERSION)..."
-  rm -rf "$ROOT/build/pyi"
-  # -m netsentinel: `python -m netsentinel` giris noktasi; veri dosyalari
-  # sys._MEIPASS/data olarak paketlenir (bkz. netsentinel/data_paths.py).
-  ( cd "$ROOT/build" && "$PYINSTALLER_PY" -m PyInstaller \
-      --noconfirm --clean --onedir --name netspectre \
-      --distpath "$ROOT/build/pyi" --workpath "$ROOT/build/work" --specpath "$ROOT/build" \
-      --paths "$ROOT/src" \
-      --add-data "$ROOT/src/netsentinel/data:data" \
-      --collect-all scapy \
-      --copy-metadata netsentinel \
-      "$ROOT/packaging/entrypoint.py" >/dev/null )
-  [ -x "$ROOT/build/pyi/netspectre/netspectre" ] || { echo "HATA: derleme basarisiz"; exit 1; }
-  "$ROOT/build/pyi/netspectre/netspectre" --version || { echo "HATA: derlenen calistirilamadi"; exit 1; }
-  echo "==> build/pyi/netspectre/netspectre"
+build_onedir() { # build_onedir <arch> <outdir>
+  local arch="$1" outdir="$2"
+  ensure_build_env
+  if [ "$arch" = "$(host_arch)" ]; then
+    pyi_local onedir "$outdir"
+  else
+    pyi_cross onedir "$arch" "$outdir"
+  fi
+  [ -x "$outdir/$BIN" ] || die "Build failed: $outdir/$BIN not found"
 }
 
-build_linux() {
-  local fmt="$1"
-  pyi_build
+build_onefile() { # build_onefile <arch> <outdir>
+  local arch="$1" outdir="$2"
+  ensure_build_env
+  if [ "$arch" = "$(host_arch)" ]; then
+    pyi_local onefile "$outdir"
+  else
+    pyi_cross onefile "$arch" "$outdir"
+  fi
+  [ -x "$outdir/$BIN" ] || die "Build failed: $outdir/$BIN not found"
+}
 
-  case "$fmt" in
-    appimage)
-      echo "==> AppImage paketleniyor..."
-      APPDIR="$ROOT/build/NetSpectre.AppDir"
-      rm -rf "$APPDIR"
-      mkdir -p "$APPDIR/usr/share/netspectre" "$APPDIR/usr/share/applications" \
-               "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+# =====================================================================
+# Linux
+# =====================================================================
+linux_appimage() {
+  local arch="$1" appdir onedir out tool runtime
+  appdir="$STAGE/$APP-$arch.AppDir"
+  onedir="$STAGE/onedir-$arch"
+  out="$(asset linux "$arch" AppImage)"
+  mkdir -p "$CACHE" "$DIST"
+  rm -rf "$appdir"
 
-      # PyInstaller onedir agaci oldugu gibi tasinir (binary yaninda _internal).
-      cp -a "$ROOT/build/pyi/netspectre/." "$APPDIR/usr/share/netspectre/"
-      cp "$ROOT/packaging/netspectre.png" "$APPDIR/netspectre.png"
-      ln -sf netspectre.png "$APPDIR/.DirIcon"
-      cp "$ROOT/packaging/netspectre.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/netspectre.png"
+  build_onedir "$arch" "$onedir"
+  mkdir -p "$appdir/usr/lib/$BIN" "$appdir/usr/share/applications" \
+    "$appdir/usr/share/icons/hicolor/512x512/apps"
+  cp -a "$onedir/." "$appdir/usr/lib/$BIN/"
+  if prepare_icon "$appdir/$APP.png"; then
+    ln -sf "$APP.png" "$appdir/.DirIcon"
+    cp "$appdir/$APP.png" "$appdir/usr/share/icons/hicolor/512x512/apps/$APP.png"
+  fi
 
-      cat > "$APPDIR/AppRun" << 'APPRUN'
+  cat > "$appdir/AppRun" << APPRUN
 #!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-BIN="$HERE/usr/share/netspectre/netspectre"
-# Argüman varsa veya gerçek terminal varsa doğrudan çalıştır; masaüstünden
-# tıklanınca (tty yok) bir terminal aç — NetSentinel bir TUI/CLI aracıdır.
-if [ $# -gt 0 ] || [ -t 0 ]; then
-  exec "$BIN" "$@"
+HERE="\$(dirname "\$(readlink -f "\$0")")"
+export APPDIR="\$HERE"
+# With arguments or a real terminal, run directly; open a terminal only on desktop click.
+if [ \$# -gt 0 ] || [ -t 0 ]; then
+  if [ \$# -eq 0 ]; then
+    exec "\$HERE/usr/lib/$BIN/$BIN" --tui --hepsi
+  fi
+  exec "\$HERE/usr/lib/$BIN/$BIN" "\$@"
 else
-  for term in x-terminal-emulator gnome-terminal konsole xfce4-terminal alacritty kitty xterm; do
-    if command -v "$term" >/dev/null 2>&1; then
-      exec "$term" -e "$BIN"
+  for term in x-terminal-emulator gnome-terminal konsole xfce4-terminal xterm alacritty kitty; do
+    if command -v "\$term" >/dev/null 2>&1; then
+      exec "\$term" -e "\$HERE/usr/lib/$BIN/$BIN" --tui --hepsi
     fi
   done
-  exec "$BIN" "$@"
+  exec "\$HERE/usr/lib/$BIN/$BIN" --tui --hepsi
 fi
 APPRUN
-      chmod +x "$APPDIR/AppRun"
+  chmod +x "$appdir/AppRun"
 
-      cat > "$APPDIR/netspectre.desktop" << 'DESKTOP'
+  cat > "$appdir/$APP.desktop" << DESKTOP
 [Desktop Entry]
-Name=NetSentinel
-Comment=Gizli kamera ve bilinmeyen IoT cihaz tespiti
-Exec=netspectre
-Icon=netspectre
+Name=$APP
+Comment=$SUMMARY
+Exec=$APP
+Icon=$APP
 Terminal=true
 Type=Application
-Categories=System;Security;
-StartupNotify=false
+Categories=Utility;
 DESKTOP
-      cp "$APPDIR/netspectre.desktop" "$APPDIR/usr/share/applications/"
+  cp "$appdir/$APP.desktop" "$appdir/usr/share/applications/"
 
-      fetch_appimagetool
-      cd "$ROOT/build"
-      "$APPIMAGETOOL" --appimage-extract > /dev/null 2>&1 || true
-      TMP_APPIMAGE="NetSpectre.build.AppImage"
-      rm -f "$TMP_APPIMAGE"
-      fetch_appimage_runtime || true
-      if [ -n "${APPIMAGE_RUNTIME:-}" ]; then
-        ./squashfs-root/AppRun --runtime-file "$APPIMAGE_RUNTIME" -n NetSpectre.AppDir "$TMP_APPIMAGE"
-      else
-        ./squashfs-root/AppRun -n NetSpectre.AppDir "$TMP_APPIMAGE"
-      fi
-      mv -f "$TMP_APPIMAGE" NetSpectre.AppImage
-      rm -rf squashfs-root "$APPDIR"
-      cd "$ROOT"
-      echo "==> build/NetSpectre.AppImage"
-      ;;
-    targz)
-      echo "==> tar.gz paketleniyor..."
-      mkdir -p "$ROOT/build/netspectre_Linux_x86_64"
-      rm -rf "$ROOT/build/netspectre_Linux_x86_64/netspectre"
-      cp -a "$ROOT/build/pyi/netspectre" "$ROOT/build/netspectre_Linux_x86_64/netspectre"
-      cp "$ROOT/README.md" "$ROOT/build/netspectre_Linux_x86_64/" 2>/dev/null || true
-      cp "$ROOT/config.example.yaml" "$ROOT/build/netspectre_Linux_x86_64/" 2>/dev/null || true
-      cd "$ROOT/build" && tar czf netspectre_Linux_x86_64.tar.gz netspectre_Linux_x86_64 && cd "$ROOT"
-      rm -rf "$ROOT/build/netspectre_Linux_x86_64"
-      echo "==> build/netspectre_Linux_x86_64.tar.gz"
-      ;;
-    binary)
-      echo "==> build/pyi/netspectre/ (onedir)"
-      ;;
-    *)
-      echo "Bilinmeyen linux formati: $fmt (gecerli: appimage | targz | binary)"
-      exit 1
-      ;;
-  esac
+  if command -v appimagetool >/dev/null 2>&1; then
+    tool="$(command -v appimagetool)"
+  else
+    tool="$CACHE/appimagetool-$arch"
+    fetch "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$arch.AppImage" "$tool"
+  fi
+  runtime="$CACHE/runtime-$arch"
+  fetch "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-$arch" "$runtime"
+
+  rm -f "$out"
+  # Extract the tool so it also works where FUSE is unavailable.
+  ( cd "$STAGE" && "$tool" --appimage-extract >/dev/null 2>&1 || true )
+  if [ -x "$STAGE/squashfs-root/AppRun" ]; then
+    ARCH="$arch" "$STAGE/squashfs-root/AppRun" --runtime-file "$runtime" -n "$appdir" "$out"
+    rm -rf "$STAGE/squashfs-root"
+  else
+    ARCH="$arch" "$tool" --runtime-file "$runtime" -n "$appdir" "$out"
+  fi
+  echo "==> $out"
 }
 
+linux_targz() {
+  local arch="$1" name dir onedir
+  name="$APP-$VERSION-linux-$arch"
+  dir="$STAGE/$name"
+  onedir="$STAGE/onedir-$arch"
+  rm -rf "$dir"; mkdir -p "$dir" "$DIST"
+  build_onedir "$arch" "$onedir"
+  cp -a "$onedir/." "$dir/"
+  cp "$ROOT/README.md" "$ROOT/LICENSE" "$dir/" 2>/dev/null || true
+  tar -C "$STAGE" -czf "$(asset linux "$arch" tar.gz)" "$name"
+  echo "==> $(asset linux "$arch" tar.gz)"
+}
+
+linux_rpm() {
+  local arch="$1" top onedir rpmver rpmrel
+  command -v rpmbuild >/dev/null 2>&1 || die "rpmbuild not found (sudo dnf install rpm-build)."
+  top="$STAGE/rpm-$arch"
+  onedir="$STAGE/onedir-$arch"
+  rpmver="${VERSION%%-*}"
+  rpmrel="1"
+  case "$VERSION" in *-rc.*) rpmrel="0.${VERSION#*-rc.}" ;; esac
+  rm -rf "$top"
+  mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS} "$DIST"
+  build_onedir "$arch" "$onedir"
+  cp -a "$onedir" "$top/SOURCES/$BIN"
+  cat > "$top/SOURCES/net-spectre" << WRAP
+#!/bin/sh
+exec /usr/lib/$BIN/$BIN "\$@"
+WRAP
+  chmod +x "$top/SOURCES/net-spectre"
+  cat > "$top/SOURCES/$APP.desktop" << DESKTOP
+[Desktop Entry]
+Type=Application
+Name=$APP
+Comment=$SUMMARY
+Exec=net-spectre
+Icon=$APP
+Terminal=true
+Categories=Utility;
+DESKTOP
+  prepare_icon "$top/SOURCES/$APP.png" || true
+  cat > "$top/SPECS/$APP.spec" << SPEC
+%global debug_package %{nil}
+Name: $APP
+Version: $rpmver
+Release: $rpmrel
+Summary: $SUMMARY
+License: $LICENSE_ID
+BuildArch: $arch
+%description
+$SUMMARY
+%install
+mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/lib/$BIN
+cp -a %{_sourcedir}/$BIN/. %{buildroot}/usr/lib/$BIN/
+install -m 0755 %{_sourcedir}/net-spectre %{buildroot}/usr/bin/net-spectre
+mkdir -p %{buildroot}/usr/share/applications
+install -m 0644 %{_sourcedir}/$APP.desktop %{buildroot}/usr/share/applications/
+mkdir -p %{buildroot}/usr/share/icons/hicolor/512x512/apps
+install -m 0644 %{_sourcedir}/$APP.png %{buildroot}/usr/share/icons/hicolor/512x512/apps/
+%files
+/usr/bin/net-spectre
+/usr/lib/$BIN
+/usr/share/applications/$APP.desktop
+/usr/share/icons/hicolor/512x512/apps/$APP.png
+SPEC
+  rpmbuild --define "_topdir $top" --target "$arch" -bb "$top/SPECS/$APP.spec" >/dev/null
+  cp "$top/RPMS/$arch/"*.rpm "$(asset linux "$arch" rpm)"
+  echo "==> $(asset linux "$arch" rpm)"
+}
+
+linux_binary() {
+  local arch="$1" outdir
+  outdir="$STAGE/onefile-$arch"
+  mkdir -p "$DIST"
+  build_onefile "$arch" "$outdir"
+  cp "$outdir/$BIN" "$(asset linux "$arch" bin)"
+  chmod +x "$(asset linux "$arch" bin)"
+  echo "==> $(asset linux "$arch" bin)"
+}
+
+linux_source() {
+  mkdir -p "$DIST"
+  ( cd "$ROOT" && git archive --format=tar.gz --prefix="$APP-$VERSION/" \
+      -o "$DIST/$APP-$VERSION-source.tar.gz" HEAD )
+  echo "==> $DIST/$APP-$VERSION-source.tar.gz"
+}
+
+# =====================================================================
+# Dispatch
+# =====================================================================
 build_target() {
-  local os="$1" fmt="$2"
+  local os="$1" fmt="$2" archsel="${3:-all}" archs a f
+  find_python
+  mkdir -p "$STAGE" "$DIST"
   banner
-  echo "Hedef: OS=$os  Format=$fmt  Version=$VERSION"
+  echo "Target: os=$os format=$fmt arch=$archsel version=$VERSION"
   echo
+
+  if [ "$archsel" = "all" ]; then archs="$ARCHS_DEFAULT"; else archs="$archsel"; fi
+
   case "$os" in
-    linux) build_linux "$fmt" ;;
-    windows|macos|darwin)
-      echo "$os icin paketleme desteklenmiyor (bkz. --list). Python capraz derleme guvenilir degil."
-      exit 1
+    linux)
+      [ "$fmt" = "all" ] && fmt="appimage targz rpm source"
+      for f in $fmt; do
+        case "$f" in
+          source) linux_source ;;
+          appimage|targz|rpm|binary) for a in $archs; do "linux_$f" "$a"; done ;;
+          *) die "Unknown linux format: $f (valid: appimage | targz | rpm | source | binary | all)" ;;
+        esac
+      done
       ;;
-    *)
-      echo "Bilinmeyen OS: $os (gecerli: linux)"
-      exit 1
+    windows)
+      die "This project is Linux-only; Windows builds are disabled."
       ;;
+    *) die "Unknown OS: $os (valid: linux)" ;;
   esac
+
+  # Checksums for every asset in build/dist
+  ( cd "$DIST" && rm -f SHA256SUMS && sha256sum -- * > SHA256SUMS )
   echo
-  echo "Bitti."
+  echo "Done. Assets are in build/dist/ (SHA256SUMS included)."
 }
 
 interactive() {
+  local fmt
   banner
   echo
-  echo "Paket formati sec (Linux — AppImage tüm dagitimlarda calisir):"
-  select f in "AppImage (.AppImage)" "tar.gz (.tar.gz)" "Binary (onedir dizini)" "Vazgec"; do
+  echo "Select package format (Linux):"
+  select f in "All (AppImage, tar.gz, rpm)" "AppImage" "tar.gz" "rpm" "Source code" "Binary only" "Cancel"; do
     case "$REPLY" in
-      1) FMT="appimage"; break ;;
-      2) FMT="targz"; break ;;
-      3) FMT="binary"; break ;;
-      4|"") echo "Vazgecildi."; exit 0 ;;
-      *) echo "Gecersiz secim, tekrar dene." ;;
+      1) fmt="all"; break ;;
+      2) fmt="appimage"; break ;;
+      3) fmt="targz"; break ;;
+      4) fmt="rpm"; break ;;
+      5) fmt="source"; break ;;
+      6) fmt="binary"; break ;;
+      7|"") echo "Cancelled."; exit 0 ;;
+      *) echo "Invalid choice." ;;
     esac
   done
-  build_target linux "$FMT"
+  build_target linux "$fmt" all
 }
 
-# ---- argüman yönlendirme ----
-if [ $# -eq 0 ]; then
-  interactive
-  exit 0
-fi
+build_main() {
+  case "${1:-}" in
+    "") interactive ;;
+    -h|--help|help) usage ;;
+    -l|--list|list) list_targets ;;
+    linux)
+      [ $# -ge 2 ] || { echo "Format missing."; list_targets; exit 1; }
+      build_target "$1" "$2" "${3:-all}"
+      ;;
+    *) echo "Unknown command: $1"; echo; usage; exit 1 ;;
+  esac
+}
 
+# ---- entry point ----
 case "${1:-}" in
-  -h|--help|help)
-    usage
-    ;;
-  -l|--list|list)
-    list_targets
-    ;;
-  --yetki|yetki)
-    BIN="$ROOT/build/pyi/netspectre/netspectre"
-    if [ ! -x "$BIN" ]; then
-      echo "Once derle: ./netspectre linux binary"; exit 1
-    fi
-    echo "==> ARP yetkisi veriliyor (sudo sifrenizi gireceksiniz)"
-    sudo setcap cap_net_raw,cap_net_admin+eip "$(readlink -f "$BIN")" \
-      && echo "==> yetki verildi: $BIN" \
-      || { echo "HATA: setcap basarisiz"; exit 1; }
-    ;;
-  --install|install)
-    do_install
-    ;;
-  --version|-v)
-    echo "netspectre $VERSION"
-    ;;
-  linux)
-    if [ $# -lt 2 ]; then
-      echo "Format eksik. Ornek: ./netspectre linux <appimage|targz|binary>"
-      list_targets
-      exit 1
-    fi
-    if [ $# -ge 3 ]; then
-      VERSION="$3"
-    fi
-    build_target linux "$2"
-    ;;
-  windows|macos|darwin)
-    if [ $# -ge 2 ] && [ -n "${2:-}" ]; then
-      build_target "$1" "$2"
-    else
-      echo "$1 icin paketleme desteklenmiyor (bkz. --list)"
-      exit 1
-    fi
-    ;;
-  *)
-    echo "Bilinmeyen komut: $1"
-    echo
-    usage
-    exit 1
-    ;;
+  --build)     shift; build_main "$@" ;;
+  --install)   do_install ;;
+  --uninstall) do_uninstall ;;
+  *)           run_app "$@" ;;   # "./netspectre" (+ any app arguments)
 esac

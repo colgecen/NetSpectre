@@ -1,8 +1,8 @@
 """Bilinen kamera/IoT/telefon örnekleriyle uç uca analiz testi (Sprint 3 DoD)."""
 
-from netsentinel.analyzer import cihazlari_analiz_et
-from netsentinel.analyzer.fingerprint import ImzaKumesi
-from netsentinel.models import Device, NetworkInfo, RiskLevel, ScanResult
+from netspectre.analyzer import cihazlari_analiz_et
+from netspectre.analyzer.fingerprint import ImzaKumesi
+from netspectre.models import Device, NetworkInfo, RiskLevel, ScanResult
 
 IMZALAR = ImzaKumesi.varsayilan()
 GATEWAY = "192.168.1.1"
@@ -27,12 +27,12 @@ def filo() -> ScanResult:
                 ip="192.168.1.71",
                 mac="F0:18:98:AA:BB:CC",
                 vendor="Apple, Inc.",
-                hostname="Mahmutun-iPhone",
+                hostname="demo-iphone",
             ),
             Device(
                 ip="192.168.1.80",
                 mac="B0:4E:26:11:22:33",
-                hostname="mahmut-masaustu",
+                hostname="office-desktop",
                 open_ports=[22, 445, 3389],
             ),
             Device(
@@ -95,13 +95,13 @@ def test_beyaz_listeli_telefon_yesil():
     sonuc = cihazlari_analiz_et(
         filo(),
         imzalar=IMZALAR,
-        whitelist={"9A:1B:2C:3D:4E:5F": "Benim iPhone'um"},
+        whitelist={"9A:1B:2C:3D:4E:5F": "My iPhone"},
         gateway_ip=GATEWAY,
     )
     telefon = sonuc.find_by_mac("9A:1B:2C:3D:4E:5F")
     assert telefon is not None
     assert telefon.trusted
-    assert telefon.device_type == "Benim iPhone'um"
+    assert telefon.device_type == "My iPhone"
     assert telefon.risk_level is RiskLevel.GREEN
     ozet = sonuc.summary()
     assert ozet["trusted"] == 1

@@ -20,21 +20,21 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - name: Bağımlılıkları kur
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Ruff (denetim)
+      - name: Ruff (lint)
         run: ruff check .
-      - name: Ruff (biçim kontrolü)
+      - name: Ruff (format check)
         run: ruff format --check .
-      - name: Mypy (tip denetimi)
+      - name: Mypy (type check)
         run: mypy
       - name: Pytest
         run: pytest -q
 
   security-audit:
-    name: Bağımlılık güvenliği (pip-audit)
+    name: Dependency security (pip-audit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,9 +42,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: pip-audit kur
+      - name: Install pip-audit
         run: |
           python -m pip install --upgrade pip
           pip install pip-audit
-      - name: Uygulama bağımlılıklarında CVE taraması
+      - name: Scan application dependencies
         run: pip-audit --strict -r requirements.txt --progress-spinner off

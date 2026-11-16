@@ -1,12 +1,12 @@
 """ARP tarama testleri — sahte scapy cevaplarıyla, root/scapy gerekmez."""
 
-from netsentinel.discovery.arp import (
+from netspectre.discovery.arp import (
     build_requests,
     hedef_ipler,
     parse_arp_answers,
     run_arp_scan,
 )
-from netsentinel.models import NetworkInfo
+from netspectre.models import NetworkInfo
 
 
 class SahteARP:

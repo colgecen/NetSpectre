@@ -1,6 +1,6 @@
 """mDNS ayrıştırma testleri — gerçek zeroconf ağı gerekmez (sahte ServiceInfo)."""
 
-from netsentinel.discovery.mdns import WANTED_SERVICES, ServisBilgisi, bilgi_hint, temiz_hostname
+from netspectre.discovery.mdns import WANTED_SERVICES, ServisBilgisi, bilgi_hint, temiz_hostname
 
 
 class SahteInfo:

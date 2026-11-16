@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from netsentinel.models import Device, NetworkInfo, ScanResult
-from netsentinel.ui.app import NetSentinelApp
-from netsentinel.ui.widgets import CihazTablosu, DetayPanel, DurumCubugu
+from netspectre.models import Device, NetworkInfo, ScanResult
+from netspectre.ui.app import NetSpectreApp
+from netspectre.ui.widgets import CihazTablosu, DetayPanel, DurumCubugu
 
 KAMERA_MAC = "0C:75:D2:AA:BB:CC"
 SARI_MAC = "9A:1B:2C:3D:4E:5F"
@@ -34,20 +34,20 @@ def sahte_sonuc() -> ScanResult:
             Device(
                 ip="192.168.1.5",
                 mac=GUVENILIR_MAC,
-                hostname="benim-laptop",
+                hostname="laptop",
                 trusted=True,
             ),
             Device(
                 ip="192.168.1.80",
                 mac=PC_MAC,
-                hostname="mahmut-masaustu",
+                hostname="office-desktop",
                 device_type="pc",
             ),
         ],
     )
 
 
-async def taramayi_bekle(app: NetSentinelApp, pilot: object) -> None:
+async def taramayi_bekle(app: NetSpectreApp, pilot: object) -> None:
     for _ in range(200):
         await pilot.pause(0.05)  # type: ignore[attr-defined]
         if app.sonuc is not None and app.tarama_sayisi >= 1:
@@ -56,7 +56,7 @@ async def taramayi_bekle(app: NetSentinelApp, pilot: object) -> None:
 
 
 async def test_baslangic_taramasi_tabloyu_doldurur(tmp_path: Path) -> None:
-    app = NetSentinelApp(sahte_sonuc, ssid="EvWifi", rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sahte_sonuc, ssid="EvWifi", rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         tablo = app.query_one(CihazTablosu)
@@ -68,7 +68,7 @@ async def test_baslangic_taramasi_tabloyu_doldurur(tmp_path: Path) -> None:
 
 
 async def test_filtre_yalnizca_supheli_dikkat_gosterir(tmp_path: Path) -> None:
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         tablo = app.query_one(CihazTablosu)
@@ -80,7 +80,7 @@ async def test_filtre_yalnizca_supheli_dikkat_gosterir(tmp_path: Path) -> None:
 
 
 async def test_satir_secimi_detay_paneli_gunceller(tmp_path: Path) -> None:
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         tablo = app.query_one(CihazTablosu)
@@ -94,7 +94,7 @@ async def test_satir_secimi_detay_paneli_gunceller(tmp_path: Path) -> None:
 
 
 async def test_w_beyaz_listeye_ekler(tmp_path: Path) -> None:
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         tablo = app.query_one(CihazTablosu)
@@ -115,7 +115,7 @@ async def test_w_beyaz_listeye_ekler(tmp_path: Path) -> None:
 
 async def test_e_disa_aktar_json_yazar(tmp_path: Path) -> None:
     yol = tmp_path / "rapor.json"
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=yol)
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=yol)
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         await pilot.press("e")
@@ -131,7 +131,7 @@ async def test_r_yeniden_tara_sayaci_artirir(tmp_path: Path) -> None:
     def sayan() -> ScanResult:
         return sahte_sonuc()
 
-    app = NetSentinelApp(sayan, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sayan, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         onceki = app.tarama_sayisi
@@ -144,13 +144,13 @@ async def test_r_yeniden_tara_sayaci_artirir(tmp_path: Path) -> None:
 
 
 async def test_ag_ilerleme_durum_cubugunu_gunceller(tmp_path: Path) -> None:
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         app.ag_ilerleme(2, 3, "KomsuAg")
         await pilot.pause()
         durum = app.query_one(DurumCubugu)
-        assert "[2/3] KomsuAg" in durum.durum
+        assert "[2/3] scanning KomsuAg" in durum.durum
         assert "KomsuAg" in str(durum.render())
 
 
@@ -165,7 +165,7 @@ async def test_t_tum_aglari_tarar_ve_atlanan_gerekceyi_gosterir(tmp_path: Path) 
         coklu.notlar = ["KomsuNet: kayıtlı NetworkManager profili yok"]
         return coklu
 
-    app = NetSentinelApp(tek_fn, ssid="EvWifi", tum_ag_fn=tum, rapor_yolu=tmp_path / "r.json")
+    app = NetSpectreApp(tek_fn, ssid="EvWifi", tum_ag_fn=tum, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         onceki = app.tarama_sayisi
@@ -177,8 +177,8 @@ async def test_t_tum_aglari_tarar_ve_atlanan_gerekceyi_gosterir(tmp_path: Path) 
         assert app._coklu_ag is True
         assert app.sonuc is not None and any("KomsuNet" in not_ for not_ in app.sonuc.notlar)
         durum = app.query_one(DurumCubugu)
-        assert "1 ağ atlandı" in durum.durum
-    app = NetSentinelApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
+        assert "1 networks skipped" in durum.durum
+    app = NetSpectreApp(sahte_sonuc, rapor_yolu=tmp_path / "r.json")
     async with app.run_test() as pilot:
         await taramayi_bekle(app, pilot)
         await pilot.press("q")
